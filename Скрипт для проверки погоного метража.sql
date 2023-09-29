@@ -6,41 +6,41 @@ SET @dateEnd = '2023-01-30 19:00:00';
 
 SELECT DB.BLAST_LOCATION_SNAME AS 'Blok'
 
---,DH.HOLE_CODE AS 'Название скважины'
+--,DH.HOLE_CODE AS 'РќР°Р·РІР°РЅРёРµ СЃРєРІР°Р¶РёРЅС‹'
 
---,DH.DESIGN_NORTHING AS 'Плановый X устья'
+--,DH.DESIGN_NORTHING AS 'РџР»Р°РЅРѕРІС‹Р№ X СѓСЃС‚СЊСЏ'
 
---,DH.DESIGN_EASTING as 'Плановый Y устья'
+--,DH.DESIGN_EASTING as 'РџР»Р°РЅРѕРІС‹Р№ Y СѓСЃС‚СЊСЏ'
 
---,DH.DESIGN_ELEVATION AS 'Плановый Z устья'
+--,DH.DESIGN_ELEVATION AS 'РџР»Р°РЅРѕРІС‹Р№ Z СѓСЃС‚СЊСЏ'
 
---,DH.DESIGN_TOE_NORTHING AS 'Плановый X забоя'
+--,DH.DESIGN_TOE_NORTHING AS 'РџР»Р°РЅРѕРІС‹Р№ X Р·Р°Р±РѕСЏ'
 
---,DH.DESIGN_TOE_EASTING AS 'Плановый Y забоя'
+--,DH.DESIGN_TOE_EASTING AS 'РџР»Р°РЅРѕРІС‹Р№ Y Р·Р°Р±РѕСЏ'
 
---,DH.DESIGN_TOE_ELEVATION AS 'Плановый Z забоя'
+--,DH.DESIGN_TOE_ELEVATION AS 'РџР»Р°РЅРѕРІС‹Р№ Z Р·Р°Р±РѕСЏ'
 
---,DH.DESIGN_DEPTH AS 'Плановая глубина'
+--,DH.DESIGN_DEPTH AS 'РџР»Р°РЅРѕРІР°СЏ РіР»СѓР±РёРЅР°'
 
---,DT2.HOLE_NORTHING AS 'Фактический X устья'
+--,DT2.HOLE_NORTHING AS 'Р¤Р°РєС‚РёС‡РµСЃРєРёР№ X СѓСЃС‚СЊСЏ'
 
---,DT2.HOLE_EASTING AS 'Фактический Y устья'
+--,DT2.HOLE_EASTING AS 'Р¤Р°РєС‚РёС‡РµСЃРєРёР№ Y СѓСЃС‚СЊСЏ'
 
---,DT2.HOLE_ELEVATION AS 'Фактический Z устья'
+--,DT2.HOLE_ELEVATION AS 'Р¤Р°РєС‚РёС‡РµСЃРєРёР№ Z СѓСЃС‚СЊСЏ'
 
---,DT3.HOLE_TOE_NORTHING AS 'Фактический X забоя'
+--,DT3.HOLE_TOE_NORTHING AS 'Р¤Р°РєС‚РёС‡РµСЃРєРёР№ X Р·Р°Р±РѕСЏ'
 
---,DT3.HOLE_TOE_EASTING AS 'Фактический Y забоя'
+--,DT3.HOLE_TOE_EASTING AS 'Р¤Р°РєС‚РёС‡РµСЃРєРёР№ Y Р·Р°Р±РѕСЏ'
 
---,DT3.HOLE_TOE_ELEVATION AS 'Фактический Z забоя'
--- ,DT1.sum_HOLE_DEPTH AS 'Фактическая глубина'
-,DT3.EQUIP_IDENT as 'Станок'
+--,DT3.HOLE_TOE_ELEVATION AS 'Р¤Р°РєС‚РёС‡РµСЃРєРёР№ Z Р·Р°Р±РѕСЏ'
+-- ,DT1.sum_HOLE_DEPTH AS 'Р¤Р°РєС‚РёС‡РµСЃРєР°СЏ РіР»СѓР±РёРЅР°'
+,DT3.EQUIP_IDENT as 'РЎС‚Р°РЅРѕРє'
 ,sum (DT1.sum_HOLE_DEPTH) AS 'metr'
-,count (DH.HOLE_CODE) AS 'Количество скважин'
---,DT2.DRILL_START_TIMESTAMP AS 'Начало бурения'
---,DT3.END_TIMESTAMP AS 'Окончание бурения'
+,count (DH.HOLE_CODE) AS 'РљРѕР»РёС‡РµСЃС‚РІРѕ СЃРєРІР°Р¶РёРЅ'
+--,DT2.DRILL_START_TIMESTAMP AS 'РќР°С‡Р°Р»Рѕ Р±СѓСЂРµРЅРёСЏ'
+--,DT3.END_TIMESTAMP AS 'РћРєРѕРЅС‡Р°РЅРёРµ Р±СѓСЂРµРЅРёСЏ'
 --,DH.COMMENT 
---,C.PIT_NAME AS 'Лицензия' 
+--,C.PIT_NAME AS 'Р›РёС†РµРЅР·РёСЏ' 
 --,DT1.changetime
 FROM asugtk.DRILL_HOLE DH
 INNER JOIN asugtk.DRILL_BLAST DB ON DH.DRILL_BLAST_IDENT=DB.DRILL_BLAST_IDENT
