@@ -1,15 +1,6 @@
-
-
 DECLARE @dateStart as datetime, @dateEnd as datetime, @offset as int;
-
-
-
 SET @dateStart = '2023-02-11 07:00:00';
 SET @dateEnd = '2023-02-11 19:00:00';
-
-
-
-
 select
 	cast (T.WencoId as NVARCHAR (40)) as WencoId,
 	T.DrillBlockNumber, 
