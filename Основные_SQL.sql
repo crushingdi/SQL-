@@ -1,4 +1,4 @@
-4.
+
 -----проверить расширения бвр на запас
 select* from accmovements_nodeinstance accnode
 left join dbomovements_boreholestore movborstore on movborstore.elementid=accnode.elementid
