@@ -1,79 +1,10 @@
-DTO необходим, чтобы общались BACK и UI
-
-------------------------------------------------------------------------------------------
-чтобы выгрузить из EA класс
-Develop - Generate - singlelement
-
-
-
-------------------------------------------------------------------
-Запасы - nodeinstance 
-Место хранение storeplace
-
-LabeledItem - составной тип . 
-к примеру
-oreholeDto.Stage.Id - PlannedBorehole.Stage.ElementId
-BoreholeDto.Stage.Label -  Label TreeNode полученный из MDM по PlannedBorehole.Stage.ElementId
-
-BoreholeDto.Turn.Id - PlannedBorehole.Turn.ElementId
-BoreholeDto.Turn.Label - Label TreeNode полученный из MDM по PlannedBorehole.Turn.ElementId
--------------------------------------------------------------------------------------------
-
-Для служб чтобы релоад сделать: \\ver-s-mesa2\e$\deploy\RcMag\RcMagDispatcher\configs
-Z:\deploy\RcMag\RcMagIm\Service\configs  конфиги
----------------------------------------------------------------------------------------
-Если версия UI слита в девелоп, то чтобы протестировать необходимо развернуть актуальную версию командой:
-/deploy ui-reg-dew develop 112
-Если тестируем отдельный тикет,то чтобы протестировать необходимо развернуть актуальную версию командой:
-/deploy ui-reg-dew 29674 112
-
-В телеги боту RCBI PolyusMec CI пишем Ветка GIT::
-
- /build PolyusMesPa.Service 29246 snapshot
-29246  - номер тикета
-snapshot или release
-
-/build PolyusMesPa.Service release/11.0 release
-
-деплой сервисов через тимсити
-
-
-
-Если необходима миграция указывается в тикете обычно:https://gitlab.rcbi.pro/polyus-mes/datamigration/-/merge_requests/74 ,
-то необходимо сделать миграцию через команду: /migrate cont07-07-2022 112
-cont07-07-2022 - имя базы
-112 - имя сервера
----------------------------------------------------------------------------------------
-
-заметки:
-
-1.
-select * from pageology_pit
-
-elementcode для конфига БВР поля PitElementCode
------------------------------------------------------------
-2. Интерфейсы 
-
-Типовое решение.Прикладные функции.Производственный учёт.Учёт движения партий материалов и горной массы.БВР."Polyus.Mes.Dbo"."Polyus.Mes.Dbo.Ui"
-
-3. Апдейт скважины, по ищем
-HoleId: "aebdd4b5f75a441c9d21be3b12fdbe6b"
-идем в табличку select * from  dbo_borehole
-where elementid = 'aebdd4b5f75a441c9d21be3b12fdbe6b'
-
-ставим ручками true на isavailabletocharge и обновляем.
-
------------------------------------------------------------
 4.
 -----проверить расширения бвр на запас
 select* from accmovements_nodeinstance accnode
 left join dbomovements_boreholestore movborstore on movborstore.elementid=accnode.elementid
 where movborstore.elementid='baac0e51ef164a39b83062629f75982a'
 -----------------------------------------------------------
-5. 
 
-
------------------------------------------------------------
 6. Сделать блок доступным для взрывания
 
 select * from public.dbo_blastproject where block='e4431fb212ba41b5aa0ca28c72d66453'
