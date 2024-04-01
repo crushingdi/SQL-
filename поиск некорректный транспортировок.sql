@@ -1,4 +1,5 @@
 SET TIME ZONE 'Asia/Irkutsk';
+
 WITH TM(dtstart, dtfinish) as ((VALUES(DATE_TRUNC('DAY', ('2022-01-01'::TIMESTAMP)::DATE),DATE_TRUNC('DAY', ('2022-05-02'::TIMESTAMP))::DATE))) -- Входные параметры
 select 
 wencoid, 
