@@ -1,10 +1,13 @@
 
+4.
 -----проверить расширения бвр на запас
 select* from accmovements_nodeinstance accnode
 left join dbomovements_boreholestore movborstore on movborstore.elementid=accnode.elementid
 where movborstore.elementid='baac0e51ef164a39b83062629f75982a'
 -----------------------------------------------------------
 
+
+-----------------------------------------------------------
 6. Сделать блок доступным для взрывания
 
 select * from public.dbo_blastproject where block='e4431fb212ba41b5aa0ca28c72d66453'
@@ -2091,17 +2094,23 @@ INNER JOIN (
 
 проверить пустые движения и pr 
 
-select b.number,b.elementid,pr.elementid pr,acc.elementid mov,acc.sourcecreation,ni.elementid ni_id ,pr.*
+select b.number,b.elementid,pr.elementid pr,acc.elementid mov,acc.sourcecreation,ni.elementid ni_id,acc.source ni_id_source,pr.*
 from public.dbomovements_producedrilledborehole pr 
 full join public.dbo_borehole b  on b.elementid=pr.borehole
 full join public.accmovements_movement acc on pr.elementid=acc.elementid
 full join public.accmovements_nodeinstance ni on ni.node=acc.destination
-where pr.work in (
-	'75ca6ea825ab48c1b36da9141e5e4a14',
-	'c57836b8a77f43e1b3c203904370ec91',
-	'c81b09d32dc24589bfddff732f3f13db')
+full join public.accmovements_nodeinstance ni2 on ni.node=acc.source
+where acc.modelreference='o:site/app/RcAppProAcc/AccountingModelDetail' and  pr.startat >='2024-03-01 02:51:25+07' --and acc.elementid is null 
+--pr.work in (	'3805b9a8f3fb42df806b26aa12c2fe7b')
 
+OR
 
+select b.number,b.elementid,pr.elementid pr,acc.elementid mov,acc.sourcecreation,pr.*
+from public.dbomovements_producedrilledborehole pr 
+full join public.dbo_borehole b  on b.elementid=pr.borehole
+full join public.accmovements_movement acc on pr.elementid=acc.elementid
+where pr.work in (	'59a04522b5d143a6bc4e61ea186ce09f')
+order by b.number
 
 
 -----------------
@@ -2158,3 +2167,84 @@ where drillbock.number = '1110-4' -- ввести буровой блок
 --and b.plannedborehole<>pl.elementid
 --and pl.number<>b.number
 order by pl.number
+
+
+----------------------
+select b.number,ch.borehole,acc.elementid,ch.consumedmaterial_priority ,acc.material,mm.elementid,mm.elementcode,ch.templatereference, * from
+public.dbomovements_chargingborehole ch
+join public.accmovements_movement acc on acc.elementid=ch.elementid
+join public.material_material mm on acc.material=mm.elementid
+join dbo_borehole b on ch.borehole=b.elementid
+where ch.work='fa94a3c1161441c982a81cbf1ce04b94'
+--and ch.borehole ='4112125eeaa84eaea476bfb7b6678975'
+and ch.templatereference='s:PolyusMesPa/Domains/DboMovements/ConsumedMaterial'
+order by ch.borehole --,mm.elementcode
+
+апдейт
+
+
+
+update public.dbomovements_chargingborehole
+set consumedmaterial_priority = 1
+where work in (
+	'7ecbcb6e435f40c4bf1820bdd9f9058e',
+	'cb1e1dd602a04787901ed59337d2ae70',
+	'04a7bbadb9684caf903fe8c60c6f80bd'
+	) and elementid in (
+select ch.elementid from
+public.dbomovements_chargingborehole ch
+join public.accmovements_movement acc on acc.elementid=ch.elementid
+join public.material_material mm on acc.material=mm.elementid
+join dbo_borehole b on ch.borehole=b.elementid
+where ch.work in (
+	'7ecbcb6e435f40c4bf1820bdd9f9058e',
+	'cb1e1dd602a04787901ed59337d2ae70',
+	'04a7bbadb9684caf903fe8c60c6f80bd'
+	)
+	
+--and ch.borehole ='4112125eeaa84eaea476bfb7b6678975'
+and ch.templatereference='s:PolyusMesPa/Domains/DboMovements/ConsumedMaterial'
+and ch.consumedmaterial_priority is null
+)
+
+
+
+----------------------------------
+Поменять блока
+select * from
+public.pageology_block
+where name ilike '%AD%'
+order by name
+
+
+select * from
+public.pageology_drillblock
+where number ilike '%AD%'
+
+select * from
+public.pageology_blastblock
+where number ilike '%AD%'
+
+select * from
+public.tree_treenode
+where elementid in (
+
+'a1733f903d514c4ab96c03c24e1d678c',
+'9ab93e16548d415c8a13fe5733fb1d6a',
+'11527c877a8647b5b7de56d711b9fd6a',
+	'9a066eae6bad4c8587f88c4302d9a4e3',
+'5af27a45c7bf46818a6e43f6885c3c6e',
+	'3872dbc491d9433b8015eb758c860f51',
+'21befc1f999241ec8a53a542c3ad6e9b'
+)
+
+
+
+
+
+
+
+
+
+
+
