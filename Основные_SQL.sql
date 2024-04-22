@@ -1091,23 +1091,12 @@ and tb.borehole='8ade42019e9644a5bc396f2237fe781e' and ch.elementid='4b8e0db61bd
 ('096e9152a8234db9862d9aa888563107'/*,
 '4b8e0db61bd94814979f77609cce53a9'*/)
 
-
-
-
-
-
----------------------------------------------
-
-
-
-
 ----------------------Обновленный запрос интегра для скважин 
 DECLARE @dateStart as datetime, @dateEnd as datetime, @offset as int;
 /*
 SET @offset = (select top 1 Offset from [asugtk].TimezoneAdjustment);
 SET @dateStart = DATEADD(MINUTE, -@timeOffsetBack, @timeMark);
 SET @dateEnd = DATEADD(MINUTE, @timeOffsetDir, @dateStart);*/
-
 
 SET @dateStart = '2023-08-10 19:00:00';
 SET @dateEnd = '2023-10-11 19:00:00';
@@ -1194,8 +1183,6 @@ select
 	--cast(IIF(T.HoleId like '%П%',3, T.DrillHoleType) as int) AS DrillHoleType
 	--,T.HAS_MANUAL_DEPTH
 	,T.IS_REDRILL  as IS_REDRILL 
-	
-	
 from (
 select distinct
 	--N'DH/'+CAST(DT2.DRILL_BLAST_IDENT as NVARCHAR(30)) + '/' +  replace(replace(replace(replace(DT2.HOLE_CODE ,'/''-',''),'(',''),')',''),' ','') as WencoId,
@@ -1289,9 +1276,6 @@ where DT.DRILL_REC_IDENT in
 group by WencoId, DrillBlockNumber, HoleId, PlannedCollarY, PlannedCollarX, PlannedCollarZ, PlannedToeY, PlannedToeX, PlannedToeZ, EquipmentId, LicenseName, DrillHoleType,T.HoleIdCount,T.HoleId,DateTimeChange,T.DateTimeDelete,T.IS_REDRILL --WencoId2 ---,HAS_MANUAL_DEPTH
 
 ) as T
-
-
-
 UNION ALL
 
 select  
@@ -1430,8 +1414,6 @@ group by WencoId, DrillBlockNumber, HoleId, PlannedCollarY, PlannedCollarX, Plan
 	  ) as T	
 order by DateTimeDelete desc
 
-
-
 --------------------
 
 Запас уже существует. id: fddd8d835f5e4a6eb126929349dfdb10; code: Store Карьер Вернинский/800/800-77//П084|c19ca8c50d4348f0a160f81269fab4f6; timeRange: [2023-10-09T19:00:00.0000000+08:00 - 2023-10-10T07:00:00.0000000+08:00]; previousStore: [ - ]; storage: [Пробуренные скважины - 98fd8358b52b4b118e8d3a22ea20ff5c]; storePlace: Карьер Вернинский/800/800-77//П084|8f2d00f62fa94673b687b937b61790ce|2023-10-09T19:00:00.0000000+08:00-]. Store: code: Store |738308c349b64445a9c5f49d161d59f7; timeRange: [2023-10-09T19:00:00.0000000+08:00 - ]; previousStore: [ - ]; storage: [Пробуренные скважины - 98fd8358b52b4b118e8d3a22ea20ff5c]; storePlace: Карьер Вернинский/800/800-77//П084|8f2d00f62fa94673b687b937b61790ce|2023-10-09T19:00:00.0000000+08:00-];
@@ -1441,7 +1423,6 @@ order by DateTimeDelete desc
 Name: InvalidOperationException
 Message: Fault operation. Ошибки валидации:
 Запас уже существует. id: fddd8d835f5e4a6eb126929349dfdb10; code: Store Карьер Вернинский/800/800-77//П084|c19ca8c50d4348f0a160f81269fab4f6; timeRange: [2023-10-09T19:00:00.0000000+08:00 - 2023-10-10T07:00:00.0000000+08:00]; previousStore: [ - ]; storage: [Пробуренные скважины - 98fd8358b52b4b118e8d3a22ea20ff5c]; storePlace: Карьер Вернинский/800/800-77//П084|8f2d00f62fa94673b687b937b61790ce|2023-10-09T19:00:00.0000000+08:00-]. Store: code: Store |738308c349b64445a9c5f49d161d59f7; timeRange: [2023-10-09T19:00:00.0000000+08:00 - ]; previousStore: [ - ]; storage: [Пробуренные скважины - 98fd8358b52b4b118e8d3a22ea20ff5c]; storePlace: Карьер Вернинский/800/800-77//П084|8f2d00f62fa94673b687b937b61790ce|2023-10-09T19:00:00.0000000+08:00-];
-
 
 Name: Exception
 Message: Не удалось сохранить Stores.
