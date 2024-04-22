@@ -10,11 +10,8 @@ SET @offset = (select top 1 Offset from [asugtk].TimezoneAdjustment);
 SET @dateStart = DATEADD(MINUTE, -@timeOffsetBack, @timeMark);
 SET @dateEnd = DATEADD(MINUTE, @timeOffsetDir, @dateStart);*/
 
-
 SET @dateStart = '2023-02-09 07:00:00';
 SET @dateEnd = '2023-02-09 19:00:00';
-
-
 
 select
 DrillBlockNumber as Блок,
@@ -26,11 +23,8 @@ count(holeid) as Количество_скважин
 --Sum(DateTimeDelete) as удаленные
 --Пробуренные
 
-
 from
 (
-
-
 select
 	cast (T.WencoId as NVARCHAR (40)) as WencoId,
 	T.DrillBlockNumber, 
@@ -66,8 +60,6 @@ select
 	--T.DrillHoleType,
 	T.DrillHoleType as DrillHoleType
 	--cast(IIF(T.HoleId like '%П%',3, T.DrillHoleType) as int) AS DrillHoleType
-	
-	
 from (
 select distinct
 	N'DH/'+CAST(DT2.DRILL_BLAST_IDENT as NVARCHAR(30)) + '/' +  replace(replace(replace(replace(DT2.HOLE_CODE ,'/''-',''),'(',''),')',''),' ','') as WencoId
@@ -144,10 +136,8 @@ where DT.DRILL_REC_IDENT in
 		where T.Depth<>'0'  and T.EndTimeStamp<=@dateEnd --and holeid='126'  --and T.DrillBlockNumber='850-117' --and holeid='086' 
 		
 group by WencoId, DrillBlockNumber, HoleId, PlannedCollarY, PlannedCollarX, PlannedCollarZ, PlannedToeY, PlannedToeX, PlannedToeZ, EquipmentId, LicenseName, DrillHoleType,T.HoleIdCount,T.HoleId,DateTimeChange,T.DateTimeDelete
-
 /*
 UNION ALL
-
 select
 	cast (T.WencoId as NVARCHAR (40)) as WencoId,
 	T.DrillBlockNumber, 
@@ -182,8 +172,6 @@ select
 	--T.DrillHoleType,
 	T.DrillHoleType as DrillHoleType
 	--cast(IIF(T.HoleId like '%П%',3, T.DrillHoleType) as int) AS DrillHoleType
-	
-	
 from (
 select distinct
 	N'DH/'+CAST(DT2.DRILL_BLAST_IDENT as NVARCHAR(30)) + '/' +  replace(replace(replace(replace(DT2.HOLE_CODE ,'/''-',''),'(',''),')',''),' ','') as WencoId
@@ -225,15 +213,11 @@ from [asugtk].[DRILL_TRANS_DELETED_ENTRIES] DT
 	 join asugtk.DRILL_BLAST DB on DT2.DRILL_BLAST_IDENT = DB.DRILL_BLAST_IDENT
 	join asugtk.DRILL_HOLE DH on DT2.DRILL_BLAST_IDENT = DH.DRILL_BLAST_IDENT and DH.HOLE_CODE=DT2.HOLE_CODE
 	join asugtk.LOCATION_BLAST_PATTERN c on DB.BLAST_LOCATION_SNAME = c.LOCATION_SNAME
-
 	 where DT2.END_TIMESTAMP is not null  and DT2.DateTimeDelete is null
-	
 		) as T
 		where 		
 		DateTimeDelete>= @dateStart and DateTimeDelete<=@dateEnd and Depth<>'0' --and holeid='126' --and T.DrillBlockNumber='850-117' and holeid='086' and Depth<>'0' and  T.DrillBlockNumber='850-117'
-		
 group by WencoId, DrillBlockNumber, HoleId, PlannedCollarY, PlannedCollarX, PlannedCollarZ, PlannedToeY, PlannedToeX, PlannedToeZ, EquipmentId, LicenseName, DrillHoleType,T.HoleIdCount,T.HoleId,DateTimeChange*/
-		
 --order by  EndTimeStamp
 		) as W
 		group by DrillBlockNumber,EquipmentId  --, DateTimeDelete --,EndTimeStamp
