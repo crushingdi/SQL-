@@ -1,0 +1,21 @@
+--Select date/shift заряженных/не заряжанных toblastborehole включенных в Blastproject
+
+select b.number,
+p.number,
+tb.ischarged ischarged,
+tb.project blast_id , 
+tb.elementid toblastborehole_id,
+ch.elementid chargingwork_id,
+char.work char_work,
+ch.shiftdef,
+shift.proday, 
+tt.elementcode
+from
+public.dbo_toblastborehole tb
+full join dbo_borehole b on b.elementid=tb.borehole
+full join public.dbo_plannedborehole p on p.elementid=tb.plannedborehole
+full join public.dbomovements_chargingborehole char on char.borehole=tb.borehole
+full join public.dbo_chargingwork ch on char.work=ch.elementid
+full join public.dbo_shiftdef shift on shift.elementid=ch.shiftdef
+full  join tree_treenode tt on tt.elementid = shift.timesdef
+where tb.project='407ca2b4ab614d439806aff9326c25e3'
