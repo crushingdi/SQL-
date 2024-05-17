@@ -1,0 +1,36 @@
+USE [IntegraDB]
+GO
+/****** Object:  Trigger [asugtk].[tr_HAUL_CYCLE_TRANS_OnUpdate]    Script Date: 5/17/2024 8:26:52 PM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+ALTER TRIGGER [asugtk].[tr_HAUL_CYCLE_TRANS_OnUpdate]
+	ON [asugtk].[HAUL_CYCLE_TRANS] 
+	AFTER UPDATE
+AS 
+BEGIN
+	SET NOCOUNT ON;
+
+MERGE [dbo].[asugtk2mes_journal] journal
+USING inserted
+ON journal.[operid] = inserted.HAUL_CYCLE_REC_IDENT and journal.[SourceTableName]= 'asugtk.HAUL_CYCLE_TRANS'
+WHEN MATCHED THEN
+UPDATE SET [ChangeType] = 'UPDATE', [changetime] = GetDate(), [is_reading] = 0
+WHEN NOT MATCHED BY TARGET THEN 
+INSERT 
+           ([SourceTableName]
+           ,[ChangeType]
+           ,[operid]
+           ,[changetime]
+		   ,[is_reading]
+		   ,[UpdTriggerTableName])
+     VALUES
+           ('asugtk.HAUL_CYCLE_TRANS',
+           'UPDATE',
+           HAUL_CYCLE_REC_IDENT
+           ,getdate()
+		   ,0
+		   ,'asugtk.HAUL_CYCLE_TRANS');
+END
