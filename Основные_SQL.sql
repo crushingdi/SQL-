@@ -1,366 +1,91 @@
-10. Выверка АРММ и МЕС
----МЕС:
-	
-SET TIME ZONE 'Asia/Irkutsk';
---EXPLAIN (ANALYZE, COSTS, VERBOSE, BUFFERS, FORMAT JSON)
-WITH TM(dt) as (VALUES(DATE_TRUNC('DAY', ('2022-11-30'::DATE)::TIMESTAMP)))
-Select --Наименование,
---МатериалКомпонента,
-Точка_погрузки,
-Точка_разгрузки,
-Интматериал,
-Лицензия,
-Погрузчик,
-Sum(МассаТвердого) as Масса, 
-Sum(ЖидМасса) as Объем,
---sum(КолВоЗолотаИЛИ_КолВоКомпонента) as КолВоЗолота
---avg(СодержаниеЗолотаИЛИ_СодержаниеКомпонента) as СодержаниеКомпонента1ЗаМесяц,
- --avg(СодержаниеВКомпоненте) as СодержаниеВКомпоненте,
- sum(КолВоВКомпоненте) as КолВоЗолота
- /*case 
- 	when sum(КолВоВКомпоненте)<> null then sum(КолВоВКомпоненте)
-	when sum(КолВоВКомпоненте) is null then null
-	end as КолВоВКомпоненте*/
- from
-(SELECT
-	ac.elementcode,									/* Результрующие колонки */
-	am.starttime,
-	am.endtime,
-	--ac.elementcode as Наименование, 
- PMP.transportationmovement_loadername as Погрузчик,
--- anode2.ElementCode as Точка_погрузки,
-anode3.ElementCode as Точка_разгрузки,
- T_Licenz.elementcode as Лицензия,
- pgb.elementcode as Точка_погрузки,
- mvint.elementcode as Интматериал,
-	mm.fullname as Материал,mn.fullname as МатериалКомпонента, mq.Fullname as Компонент,
- 
-	/* Парсинг Json для компонентов */
-	Coalesce((((SELECT Value FROM jsonb_array_elements(am.Amount::jsonb->'Attributes') WHERE jsonb_extract_path_text(Value, 'Id')='Value')->'Value'->>'Value')::float),0) as МассаТвердого,
-Coalesce((((SELECT Value FROM jsonb_array_elements(am.Extraamount::jsonb->'Attributes') 			WHERE jsonb_extract_path_text(Value, 'Id')='Value')->'Value'->>'Value')::float), 0) as ЖидМасса,
-Coalesce((((SELECT Value FROM json_array_elements(
-(SELECT Value FROM json_array_elements(ct.Value->'Attributes') as t1 					WHERE (t1.Value->>'Id')='Fraction')->'Value'->'Attributes') as t2
-				WHERE (t2.Value->>'Id')='Value')->'Value'->>'Value')::float), 0) as СодержаниеЗолотаИЛИ_СодержаниеКомпонента,
-Coalesce((((SELECT Value FROM json_array_elements(
-(SELECT Value FROM json_array_elements(ct.Value->'Attributes') as t1 					WHERE (t1.Value->>'Id')='Amount')->'Value'->'Attributes') as t2
-				WHERE (t2.Value->>'Id')='Value')->'Value'->>'Value')::float), 0) as КолВоЗолотаИЛИ_КолВоКомпонента,
-Coalesce((((Select Value from json_array_elements(
-(SELECT Value FROM json_array_elements(
-(SELECT Value FROM json_array_elements(ct.Value->'Attributes') as t1 				WHERE (t1.Value->>'Id')='Components')->'Value'->'Elements' ->0->'Attributes') as t2
-				WHERE (t2.Value->>'Id')='Fraction')->'Value'->'Attributes') as t3  			WHERE (t3.Value ->>'Id')='Value')->'Value'->>'Value')::float), 0) as СодержаниеВКомпоненте,
-Coalesce((((Select Value from json_array_elements(
-(SELECT Value FROM json_array_elements(
-(SELECT Value FROM json_array_elements(ct.Value->'Attributes') as t1 				WHERE (t1.Value->>'Id')='Components')->'Value'->'Elements' ->0->'Attributes') as t2
-				WHERE (t2.Value->>'Id')='Amount')->'Value'->'Attributes') as t3  			WHERE (t3.Value ->>'Id')='Value')->'Value'->>'Value')::float), 0) as КолВоВКомпоненте
-from accchannels_channel ac
-join accmovements_movement am on ac.elementid=am.channel
-left join public.pamovements_mixedpolygonentity PMP ON PMP.elementid = AM.elementid --Транспортировка
-join accchannels_nodebase anode2 on anode2.elementid=pmp.transportationmovement_movementfrom 
-join accchannels_nodebase anode3 on anode3.elementid=pmp.transportationmovement_movementto
-inner join public.accmovements_nodeinstance ANI_Source ON ANI_Source.elementid = AM.source
-inner join public.accmovements_nodeinstance ANI_Dest ON ANI_Dest.elementid = AM.destination
-join paminingpolygon_miningpolygoncollection T_Licenz                              
-ON T_Licenz.elementid = PMP.licencemix::json->'Elements'-> 0 -> 'Attributes'-> 0 ->'Value'->'Attributes'-> 0 ->'Value' ->>'Value'
-join pageology_outline pgo on pgo.elementid=pmp.outline 
-join pageology_block pgb on pgo.block=pgb.elementid
-join mvmaterials_materialint mvint on mvint.elementid=pgo.integrationmaterial
-  --join pageology_level pgl on pgl.elementid=pgb.level
-join material_material mm on mm.elementid = am.material
-	------cross JOIN LATERAL
-cross JOIN LATERAL json_array_elements(am.Components::json->'Elements') as ct
-	left join material_material mn ON mn.elementid = 
-(SELECT Value 
-	FROM json_array_elements(
-(SELECT Value FROM json_array_elements(ct.Value->'Attributes') as t1 WHERE (t1.Value->>'Id')='Material')->'Value'->'Attributes') as t2
-			WHERE (t2.Value->>'Id')='ElementId')->'Value'->>'Value' 
-	
-left join material_material mq ON mq.elementid = 
-(Select Value from json_array_elements(
-(SELECT Value FROM json_array_elements(
-(SELECT Value FROM json_array_elements(ct.Value->'Attributes') as t1 				
-	WHERE (t1.Value->>'id')='Components')->'Value'->'Elements' ->1->'Attributes') as t2
-		WHERE (t2.Value->>'id')='Material')->'Value'->'Attributes') as t3  			
-			WHERE (t3.Value ->>'id')='ElementId')->'Value'->>'Value'
-where  am.modelreference = 'o:site/app/RcAppProAcc/AccountingModelDetail'
-and  (am.endtime > date_trunc('Month',(SELECT dt FROM TM))-interval '5 hour' and am.endtime <= (select dt from tm)::timestamp + interval '19 hour'	)											/*Выбор необходимых хранилищ*/
-and
-ac.elementcode in ( 
-	'Взорванная горная масса (субконтура) --> Экскавация'    
-     ) --Массив каналов
- UNION ALL
-  SELECT
-	ac.elementcode,									/* Результрующие колонки */
-	am.starttime,
-	am.endtime,
- PMP.transportationmovement_loadername as Погрузчик,
-anode3.ElementCode as Точка_разгрузки,
- T_Licenz.elementcode as Лицензия,
- anode2.ElementCode as Точка_погрузки,
- --pgb.elementcode as Точка_погрузки,
- mvint.elementcode as Интматериал,
-	mm.fullname as Материал,mn.fullname as МатериалКомпонента, mq.Fullname as Компонент,
- /*
-  ac.elementcode,									/* Результрующие колонки */
-	am.starttime,
-	am.endtime,
- PMP.transportationmovement_loadername as Погрузчик,
-anode3.ElementCode as Точка_разгрузки,
- T_Licenz.elementcode as Лицензия,
- pgb.elementcode as Точка_погрузки,
- mvint.elementcode as Интматериал,
-	mm.fullname as Материал,mn.fullname as МатериалКомпонента, mq.Fullname as Компонент,
-	/* Парсинг Json для компонентов */
-	Coalesce((((SELECT Value FROM jsonb_array_elements(am.Amount::jsonb->'Attributes') WHERE jsonb_extract_path_text(Value, 'Id')='Value')->'Value'->>'Value')::float),0) as МассаТвердого,
-Coalesce((((SELECT Value FROM jsonb_array_elements(am.Extraamount::jsonb->'Attributes') 			WHERE jsonb_extract_path_text(Value, 'Id')='Value')->'Value'->>'Value')::float), 0) as ЖидМасса,
-Coalesce((((SELECT Value FROM json_array_elements(
-(SELECT Value FROM json_array_elements(ct.Value->'Attributes') as t1 					WHERE (t1.Value->>'Id')='Fraction')->'Value'->'Attributes') as t2
-				WHERE (t2.Value->>'Id')='Value')->'Value'->>'Value')::float), 0) as СодержаниеЗолотаИЛИ_СодержаниеКомпонента,
-Coalesce((((SELECT Value FROM json_array_elements(
-(SELECT Value FROM json_array_elements(ct.Value->'Attributes') as t1 					WHERE (t1.Value->>'Id')='Amount')->'Value'->'Attributes') as t2
-				WHERE (t2.Value->>'Id')='Value')->'Value'->>'Value')::float), 0) as КолВоЗолотаИЛИ_КолВоКомпонента,
-Coalesce((((Select Value from json_array_elements(
-(SELECT Value FROM json_array_elements(
-(SELECT Value FROM json_array_elements(ct.Value->'Attributes') as t1 				WHERE (t1.Value->>'Id')='Components')->'Value'->'Elements' ->0->'Attributes') as t2
-				WHERE (t2.Value->>'Id')='Fraction')->'Value'->'Attributes') as t3  			WHERE (t3.Value ->>'Id')='Value')->'Value'->>'Value')::float), 0) as СодержаниеВКомпоненте,
-Coalesce((((Select Value from json_array_elements(
-(SELECT Value FROM json_array_elements(
-(SELECT Value FROM json_array_elements(ct.Value->'Attributes') as t1 				WHERE (t1.Value->>'Id')='Components')->'Value'->'Elements' ->0->'Attributes') as t2
-				WHERE (t2.Value->>'Id')='Amount')->'Value'->'Attributes') as t3  			WHERE (t3.Value ->>'Id')='Value')->'Value'->>'Value')::float), 0) as КолВоВКомпоненте
-from accchannels_channel ac
-join accmovements_movement am on ac.elementid=am.channel
- left join public.pamovements_mixedpolygonentity PMP ON PMP.elementid = AM.elementid --Транспортировка
- join accchannels_nodebase anode2 on anode2.elementid=pmp.transportationmovement_movementfrom 
-  join accchannels_nodebase anode3 on anode3.elementid=pmp.transportationmovement_movementto
-  inner join public.accmovements_nodeinstance ANI_Source ON ANI_Source.elementid = AM.source
-  inner join public.accmovements_nodeinstance ANI_Dest ON ANI_Dest.elementid = AM.destination
- join paminingpolygon_miningpolygoncollection T_Licenz                              
-  ON T_Licenz.elementid = PMP.licencemix::json->'Elements'-> 0 -> 'Attributes'-> 0 ->'Value'->'Attributes'-> 0 ->'Value' ->>'Value'
- join pageology_outline pgo on pgo.elementid=pmp.outline 
- join pageology_block pgb on pgo.block=pgb.elementid
- join mvmaterials_materialint mvint on mvint.elementid=pgo.integrationmaterial
-  --join pageology_level pgl on pgl.elementid=pgb.level
-	join material_material mm on mm.elementid = am.material
-	cross JOIN LATERAL json_array_elements(am.Components::json->'Elements') as ct
-	left join material_material mn ON mn.elementid = 
-(SELECT Value 
-	FROM json_array_elements(
-(SELECT Value FROM json_array_elements(ct.Value->'Attributes') as t1 WHERE (t1.Value->>'Id')='Material')->'Value'->'Attributes') as t2
-			WHERE (t2.Value->>'Id')='ElementId')->'Value'->>'Value' 
-left join material_material mq ON mq.elementid = 
-(Select Value from json_array_elements(
-(SELECT Value FROM json_array_elements(
-(SELECT Value FROM json_array_elements(ct.Value->'Attributes') as t1 				WHERE (t1.Value->>'id')='Components')->'Value'->'Elements' ->1->'Attributes') as t2
-				WHERE (t2.Value->>'id')='Material')->'Value'->'Attributes') as t3  			WHERE (t3.Value ->>'id')='ElementId')->'Value'->>'Value'
-where  am.modelreference = 'o:site/app/RcAppProAcc/AccountingModelDetail'
-and  (am.endtime > date_trunc('Month',(SELECT dt FROM TM))-interval '5 hour' and am.endtime <= (select dt from tm)::timestamp + interval '19 hour'	)											/*Выбор необходимых хранилищ*/
-and
-ac.elementcode in ( 
-	
-      'Штабель 0 --> Экскавация на складе',
-      'Штабель 1 --> Экскавация на складе',
-      'Штабель 1.1 --> Экскавация на складе',
-      'Штабель 11 --> Экскавация на складе',
-      'Штабель 15.1 --> Экскавация на складе',
-      'Штабель 15.2 --> Экскавация на складе',
-      'Штабель 15.3 --> Экскавация на складе',
-      'Штабель 15.4 --> Экскавация на складе',
-      'Штабель 2 --> Экскавация на складе',
-      'Штабель 2.1 --> Экскавация на складе',
-      'Штабель 2.2 --> Экскавация на складе',
-      'Штабель 2.3 --> Экскавация на складе',
-      'Штабель 2.4 --> Экскавация на складе',
-      'Штабель 3 --> Экскавация на складе',
-      'Штабель 4 --> Экскавация на складе',
-      'Штабель 5.1-- > Экскавация(втор.дробл.)(0139)',
-      'Склад 11 --> Экскавация на складе',
-      'Склад 13 --> Экскавация на складе',
-      'Склад 14 --> Экскавация на складе'
-     ) --Массив каналов
- UNION ALL
-SELECT
-	ac.elementcode,									
-	am.starttime,
-	am.endtime,
-	--ac.elementcode as Наименование, 
- PMP.transportationmovement_loadername as Погрузчик,
--- anode2.ElementCode as Точка_погрузки,
-anode3.ElementCode as Точка_разгрузки,
- T_Licenz.elementcode as Лицензия,
- pgb.elementcode as Точка_погрузки,
- mvint.elementcode as Интматериал,
-	mm.fullname as Материал,
-	null as МатериалКомпонента, 
-	null as Компонент,
-	/* Парсинг Json для компонентов */
-	Coalesce((((SELECT Value FROM jsonb_array_elements(am.Amount::jsonb->'Attributes') WHERE jsonb_extract_path_text(Value, 'Id')='Value')->'Value'->>'Value')::float),0) as МассаТвердого,
-Coalesce((((SELECT Value FROM jsonb_array_elements(am.Extraamount::jsonb->'Attributes') 			WHERE jsonb_extract_path_text(Value, 'Id')='Value')->'Value'->>'Value')::float), 0) as ЖидМасса,
- null as СодержаниеЗолотаИЛИ_СодержаниеКомпонента,
- null as КолВоЗолотаИЛИ_КолВоКомпонента,
- null as СодержаниеВКомпоненте,
- null as КолВоВКомпоненте
- 
- 
-/*Coalesce((((SELECT Value FROM json_array_elements(
-(SELECT Value FROM json_array_elements(ct.Value->'Attributes') as t1 					WHERE (t1.Value->>'Id')='Fraction')->'Value'->'Attributes') as t2
-				WHERE (t2.Value->>'Id')='Value')->'Value'->>'Value')::float), 0) as СодержаниеЗолотаИЛИ_СодержаниеКомпонента,
-Coalesce((((SELECT Value FROM json_array_elements(
-(SELECT Value FROM json_array_elements(ct.Value->'Attributes') as t1 					WHERE (t1.Value->>'Id')='Amount')->'Value'->'Attributes') as t2
-				WHERE (t2.Value->>'Id')='Value')->'Value'->>'Value')::float), 0) as КолВоЗолотаИЛИ_КолВоКомпонента,
-Coalesce((((Select Value from json_array_elements(
-(SELECT Value FROM json_array_elements(
-(SELECT Value FROM json_array_elements(ct.Value->'Attributes') as t1 				WHERE (t1.Value->>'Id')='Components')->'Value'->'Elements' ->0->'Attributes') as t2
-				WHERE (t2.Value->>'Id')='Fraction')->'Value'->'Attributes') as t3  			WHERE (t3.Value ->>'Id')='Value')->'Value'->>'Value')::float), 0) as СодержаниеВКомпоненте,
-Coalesce((((Select Value from json_array_elements(
-(SELECT Value FROM json_array_elements(
-(SELECT Value FROM json_array_elements(ct.Value->'Attributes') as t1 				WHERE (t1.Value->>'Id')='Components')->'Value'->'Elements' ->0->'Attributes') as t2
-				WHERE (t2.Value->>'Id')='Amount')->'Value'->'Attributes') as t3  			WHERE (t3.Value ->>'Id')='Value')->'Value'->>'Value')::float), 0) as КолВоВКомпоненте*/
+DTO необходим, чтобы общались BACK и UI
 
-from accchannels_channel ac
-	join accmovements_movement am on ac.elementid=am.channel
- 	left join public.pamovements_mixedpolygonentity PMP ON PMP.elementid = AM.elementid --Транспортировка
-
- join accchannels_nodebase anode2 on anode2.elementid=pmp.transportationmovement_movementfrom 
-  join accchannels_nodebase anode3 on anode3.elementid=pmp.transportationmovement_movementto
-  inner join public.accmovements_nodeinstance ANI_Source ON ANI_Source.elementid = AM.source
-  inner join public.accmovements_nodeinstance ANI_Dest ON ANI_Dest.elementid = AM.destination
- join paminingpolygon_miningpolygoncollection T_Licenz                              
-  ON T_Licenz.elementid = PMP.licencemix::json->'Elements'-> 0 -> 'Attributes'-> 0 ->'Value'->'Attributes'-> 0 ->'Value' ->>'Value'
- join pageology_outline pgo on pgo.elementid=pmp.outline 
- join pageology_block pgb on pgo.block=pgb.elementid
- join mvmaterials_materialint mvint on mvint.elementid=pgo.integrationmaterial
-  --join pageology_level pgl on pgl.elementid=pgb.level
-	join material_material mm on mm.elementid = am.material
-	/*cross JOIN LATERAL json_array_elements(am.Components::json->'Elements') as ct
-	left join material_material mn ON mn.elementid = 
-(SELECT Value 
-	FROM json_array_elements(
-(SELECT Value FROM json_array_elements(ct.Value->'Attributes') as t1 WHERE (t1.Value->>'Id')='Material')->'Value'->'Attributes') as t2
-			WHERE (t2.Value->>'Id')='ElementId')->'Value'->>'Value' 
-left join material_material mq ON mq.elementid = 
-(Select Value from json_array_elements(
-(SELECT Value FROM json_array_elements(
-(SELECT Value FROM json_array_elements(ct.Value->'Attributes') as t1 				WHERE (t1.Value->>'id')='Components')->'Value'->'Elements' ->1->'Attributes') as t2
-				WHERE (t2.Value->>'id')='Material')->'Value'->'Attributes') as t3  			WHERE (t3.Value ->>'id')='ElementId')->'Value'->>'Value'*/
-where  am.modelreference = 'o:site/app/RcAppProAcc/AccountingModelDetail'
-and  (am.endtime > date_trunc('Month',(SELECT dt FROM TM))-interval '5 hour' and am.endtime <= (select dt from tm)::timestamp + interval '19 hour'	)											/*Выбор необходимых хранилищ*/
-and
-ac.elementcode in ( 
-	      'Взорванная горная масса (Кадаликанское) --> Экскавация (Кадаликанское)', 
-      'Взорванная горная масса (В. Кадаликанское) --> Экскавация (В. Кадаликанское)'
-          )
-)  as q 
-group by 1,2,3,4,5
-order by 1,2,3,4,5
-	
----------------АРММ:
-SELECT 
-       t.LoadLocation
-	  ,t.DumpLocation
-	  ,t.Material
-	  ,(CASE 
-	   WHEN t.Licence = 'ДиП м.Вернинское к.Вернинский' THEN 'Вернинское № ИРК 3464 БР'
-	   WHEN t.Licence = 'ДиП м.Верх.Кадал.к.Верхний Кадаликанский' THEN 'ВКадаликанскийлицензия'
-	   WHEN t.Licence = 'ДиП м.Кадаликанское к.Кадаликанский' THEN 'Кадаликанскийлицензия'
-	   WHEN t.Licence = 'ДиП м.Первенец к.Вернинский' THEN 'Первенец № ИРК 03455 БР'
-	   WHEN t.Licence = 'ДиП м.Смежный к.Вернинский' THEN 'Смежный № ИРК 03465 БР'
-	   END) as Licence
-	  ,t.LoadEquip
-	  ,SUM(t.MassApproved) as MassApproved
-	  ,SUM(t.VolumeApproved) as VolumeApproved
-	  ,SUM(t.MassAU) as MassAU
-FROM
-(
-SELECT
-       --TF.[Block] as LoadLocation--блок, для транспортировки со склада пустое
-	   TF.[LoadLocation] as LoadLocation --место погрузки, для карьера пустое
-      ,TF.[DumpLocation] --место выгрузки
-	  ,TF.[Material] --Тип руды
-	  ,SPP.SppName as Licence --СПП|Лицензия
-      ,LE.Position as LoadEquip --погрузчик
-      --,HE.Position as  --самосвал
-      --,[Turn]--Очередь
-      --,[Stage]--Этап
-      --,Sum(TF.[Mass]) MassFact
-      --,sum(TF.[Volume]) VolFact
-	  ,AP.[Mass] MassApproved
-	  ,AP.[Volume] VolumeApproved
-	  ,(AP.FractionAu * AP.Mass)  as MassAU
-	  --,sum([MassCycleTotal]) as MassCycleTotal
-      --,sum([VolumeCycleTotal]) as VolumeCycleTotal
-  FROM [MesMarkExchangeDb].[dbo].[TransportationWorkFact]  TF
-       LEFT JOIN MesMarkExchangeDb.dbo.Equipment LE ON TF.LoadEquip = LE.ElementCode
-	   LEFT JOIN MesMarkExchangeDb.dbo.TransportationWorkApproved AP ON AP.Id = TF.Id
-	   LEFT JOIN MesMarkExchangeDb.dbo.Licence SPP ON TF.SppElement = SPP.ElementCode
-       --Left join MesMarkExchangeDb.dbo.Equipment HE on TF.TransportEquip=HE.ElementCode
-WHERE DumpTime >= '2022-10-31 19:00:00' and DumpTime <='2022-11-30 19:00:00'
-and tf.StateId=3 and ap.StateId = 3
-and tf.LoadLocation is not null
-	
-UNION ALL
-SELECT
-       TF.[Block] as LoadLocation --блок, для транспортировки со склада пустое
-	  --,TF.[LoadLocation] --место погрузки, для карьера пустое
-      ,TF.[DumpLocation] --место выгрузки
-	  ,TF.[Material] --Тип руды
-	  ,SPP.SppName as Licence --СПП|Лицензия
-      ,LE.Position as LoadEquip --погрузчик
-      --,HE.Position as  --самосвал
-      --,[Turn]--Очередь
-      --,[Stage]--Этап
-      --,Sum(TF.[Mass]) MassFact
-      --,sum(TF.[Volume]) VolFact
-	  ,AP.[Mass] MassApproved
-	  ,AP.[Volume] VolumeApproved
-	  ,(AP.FractionAu * AP.Mass)  as MassAU
-	  --,sum([MassCycleTotal]) as MassCycleTotal
-      --,sum([VolumeCycleTotal]) as VolumeCycleTotal
-  FROM [MesMarkExchangeDb].[dbo].[TransportationWorkFact]  TF
-       LEFT JOIN MesMarkExchangeDb.dbo.Equipment LE ON TF.LoadEquip = LE.ElementCode
-	   LEFT JOIN MesMarkExchangeDb.dbo.TransportationWorkApproved AP ON AP.Id = TF.Id
-	   LEFT JOIN MesMarkExchangeDb.dbo.Licence SPP ON TF.SppElement = SPP.ElementCode
-       --Left join MesMarkExchangeDb.dbo.Equipment HE on TF.TransportEquip=HE.ElementCode
-WHERE DumpTime >= '2022-10-31 19:00:00' and DumpTime <='2022-11-30 19:00:00'
-and tf.StateId=3 and ap.StateId = 3
-and tf.Block is not null
-	
-UNION ALL
-SELECT
-	   TM.[LoadLocation] as LoadLocation --место погрузки, для карьера пустое
-      ,TM.[DumpLocation] --место выгрузки
-	  ,TM.[Material] --Тип руды
-	  ,TMSPP.SppName as Licence --СПП|Лицензия
-      ,EQ.Position as LoadEquip --погрузчик
-      --,HE.Position as  --самосвал
-      --,[Turn]--Очередь
-      --,[Stage]--Этап
-      --,Sum(TF.[Mass]) MassFact
-      --,sum(TF.[Volume]) VolFact
-	  ,TMAP.[Mass] MassApproved
-	  ,TMAP.[Volume] VolumeApproved
-	  ,(TMAP.FractionAu * TMAP.Mass)  as MassAU
-	  --,sum([MassCycleTotal]) as MassCycleTotal
-      --,sum([VolumeCycleTotal]) as VolumeCycleTotal
-	  FROM [MesMarkExchangeDb].[dbo].[TrammingWorkFact] TM
-	  LEFT JOIN MesMarkExchangeDb.dbo.Equipment EQ ON TM.Equip = EQ.ElementCode
-	  LEFT JOIN MesMarkExchangeDb.dbo.Licence TMSPP ON TMSPP.ElementCode = TM.SppElement
-	  LEFT JOIN MesMarkExchangeDb.dbo.TrammingWorkApproved TMAP ON TMAP.Id = TM.Id
-	  WHERE DumpEndTime >= '2022-10-31 19:00:00' and DumpEndTime <= '2022-11-30 19:00:00'
-	  and TM.StateId = 3 and TMAP.StateId = 1
-) t
---and LoadLocation ='Штабель 3'
---and Mass != MassCycleTotal
-GROUP BY t.LoadLocation, t.DumpLocation, t.Material, t.Licence, t.LoadEquip
-ORDER BY t.LoadLocation, t.DumpLocation, t.Material, t.Licence, t.LoadEquip
+------------------------------------------------------------------------------------------
+чтобы выгрузить из EA класс
+Develop - Generate - singlelement
 
 
+
+------------------------------------------------------------------
+Запасы - nodeinstance 
+Место хранение storeplace
+
+LabeledItem - составной тип . 
+к примеру
+oreholeDto.Stage.Id - PlannedBorehole.Stage.ElementId
+BoreholeDto.Stage.Label -  Label TreeNode полученный из MDM по PlannedBorehole.Stage.ElementId
+
+BoreholeDto.Turn.Id - PlannedBorehole.Turn.ElementId
+BoreholeDto.Turn.Label - Label TreeNode полученный из MDM по PlannedBorehole.Turn.ElementId
+-------------------------------------------------------------------------------------------
+
+Для служб чтобы релоад сделать: \\ver-s-mesa2\e$\deploy\RcMag\RcMagDispatcher\configs
+Z:\deploy\RcMag\RcMagIm\Service\configs  конфиги
+---------------------------------------------------------------------------------------
+Если версия UI слита в девелоп, то чтобы протестировать необходимо развернуть актуальную версию командой:
+/deploy ui-reg-dew develop 112
+Если тестируем отдельный тикет,то чтобы протестировать необходимо развернуть актуальную версию командой:
+/deploy ui-reg-dew 29674 112
+
+В телеги боту RCBI PolyusMec CI пишем Ветка GIT::
+
+ /build PolyusMesPa.Service 29246 snapshot
+29246  - номер тикета
+snapshot или release
+
+/build PolyusMesPa.Service release/11.0 release
+
+деплой сервисов через тимсити
+
+
+
+Если необходима миграция указывается в тикете обычно:https://gitlab.rcbi.pro/polyus-mes/datamigration/-/merge_requests/74 ,
+то необходимо сделать миграцию через команду: /migrate cont07-07-2022 112
+cont07-07-2022 - имя базы
+112 - имя сервера
+---------------------------------------------------------------------------------------
+
+заметки:
+
+1.
+select * from pageology_pit
+
+elementcode для конфига БВР поля PitElementCode
+-----------------------------------------------------------
+2. Интерфейсы 
+
+Типовое решение.Прикладные функции.Производственный учёт.Учёт движения партий материалов и горной массы.БВР.'Polyus.Mes.Dbo'.'Polyus.Mes.Dbo.Ui'
+
+3. Апдейт скважины, по ищем
+HoleId: 'aebdd4b5f75a441c9d21be3b12fdbe6b'
+идем в табличку select * from  dbo_borehole
+where elementid = 'aebdd4b5f75a441c9d21be3b12fdbe6b'
+
+ставим ручками true на isavailabletocharge и обновляем.
+
+-----------------------------------------------------------
+4.
 -----проверить расширения бвр на запас
 select* from accmovements_nodeinstance accnode
 left join dbomovements_boreholestore movborstore on movborstore.elementid=accnode.elementid
 where movborstore.elementid='baac0e51ef164a39b83062629f75982a'
 -----------------------------------------------------------
-Выборка BOrehole подвержденных через метод IsApproved
-SELECT distinct dh.elementid,/*toblast.project id_project pblock."number",*/ dh."number",dh.isdefective, dh.isavailabletocharge, dh.blastblock as dhblock, db.block as dbblock, cr.project,toblast.IsApproved,toblast.addat, toblast.updateat
---elementid, isdefective, isavailabletocharge, "number",issubdrill, license, stage, 
+5. 
+
+
+-----------------------------------------------------------
+6. Сделать блок доступным для взрывания
+
+select * from public.dbo_blastproject where block='e4431fb212ba41b5aa0ca28c72d66453'
+сделать true для isreadytoblast
+
+BlastBlock: {Id: 'e4431fb212ba41b5aa0ca28c72d66453', Label: '700-5-1'}
+
+-----------------------------------------------------------
+7. Сделать скважины подвержденными через IsApproved
+
+SELECT distinct dh.elementid,/*toblast.project id_project pblock.'number',*/ dh.'number',dh.isdefective, dh.isavailabletocharge, dh.blastblock as dhblock, db.block as dbblock, cr.project,toblast.IsApproved,toblast.addat, toblast.updateat
+--elementid, isdefective, isavailabletocharge, 'number',issubdrill, license, stage, 
 --turn, drillblock, machine, blastblock, producingblock, modelreference, elementcode, 
 --addat, updateat, domain, isnondeletable, isreadonly, creationtime, expirationtime, templatereference, modelreferenceinternal
 	FROM dbo_blastproject db
@@ -373,13 +98,16 @@ SELECT distinct dh.elementid,/*toblast.project id_project pblock."number",*/ dh.
 	--and toblast.addat>'2022-11-22 19:00:00.00+07' 
 	--and toblast.IsApproved= 'false'-- 
 	--and number='016'
+
 Взять dh.elementid пойти в dbo_toblastborehole и выбрать все по проекту и апдейт атрибута IsApproved
+
 Добавить взрывной блок из модели к запросу
 
 ---------------------------------------------------------------------------------
-Store на число. делаем выборку по времени и Block и LIcense
+8.
+--запасы на число. делаем выборку по времени и блоку и лицензии
 
-Select bp.elementId,pit."name",acch.elementcode, bh.elementid as boreholeId, bh.number, ni.elementid as NiElementId
+Select bp.elementId,pit.'name',acch.elementcode, bh.elementid as boreholeId, bh.number, ni.elementid as NiElementId
 , (((SELECT Value
              FROM jsonb_array_elements(ni.store_amount::jsonb -> 'Attributes')
              WHERE jsonb_extract_path_text(Value, 'Id') = 'Value') -> 'Value' ->> 'Value')::float) as store_amount
@@ -410,10 +138,21 @@ and elementcode like 'Вер%') */
 and ni.starttime >= '2022-11-26 07:00:00 +08' and ni.endtime <= '2022-12-26 19:00:00 +08' 
 --bh.elementid = '51e3002a162b4d4fae885e01cbf66145'
 order by ni.starttime, bh.number
-	
+
+всталяем bp.elementID в запрос:
+
+select * from dbo_blastproject  where elementid = 'a4ad6a4a59884e30a90cae5247c83ab2'
+
+select * from dbo_toblastborehole 
+where project = '9418c3675ac948b2893cb0ccb0d76be1'
+
+делаем апдейт всех скважин по проекту в статус isapproved = true:
+
+update dbo_toblastborehole set isapproved = true where project = 'bdc0c6c91c144b48a4e3f6fa74314525' and isapproved = false
+
 ---------------------------------------------------------------
-Сверка Бурения 
-1. Запрос PostgreSQL
+9. Сверка Бурения 
+1. Запрос постгрес
 
 	SET TIME ZONE 'Asia/Irkutsk';
 Select 
@@ -512,8 +251,12 @@ group by --ДатаБурения,
 OperSysId,ктосоздал,PDB.addat,PDB.updateat,position,batchid,am.elementid,bh.elementid,bl.elementid,PDB.borehole,PDB_work, mv.elementcode
 order by ДатаБурения,Смена,Скважина
 	
+	
+	
+	
 
-и запрос обменной БД Integra MS SQL :
+
+и запрос интегра:
 --Новый запрос
 /*Declare @timeOffsetBack as int, @timeOffsetDir as int, @timeMark as datetime;
 set @timeOffsetBack = '60'
@@ -525,8 +268,11 @@ DECLARE @dateStart as datetime, @dateEnd as datetime, @offset as int;
 SET @offset = (select top 1 Offset from [asugtk].TimezoneAdjustment);
 SET @dateStart = DATEADD(MINUTE, -@timeOffsetBack, @timeMark);
 SET @dateEnd = DATEADD(MINUTE, @timeOffsetDir, @dateStart);*/
+
+
 SET @dateStart = '2023-09-26 19:00:00';
 SET @dateEnd = '2023-10-05 19:00:00';
+
 select
 	cast (T.WencoId as NVARCHAR (40)) as WencoId,
 	T.DrillBlockNumber, 
@@ -562,7 +308,9 @@ select
 	--T.DrillHoleType,
 	T.DrillHoleType as DrillHoleType
 	--cast(IIF(T.HoleId like '%П%',3, T.DrillHoleType) as int) AS DrillHoleType
-	--,T.HAS_MANUAL_DEPTH	
+	--,T.HAS_MANUAL_DEPTH
+	
+	
 from (
 select distinct
 	N'DH/'+CAST(DT2.DRILL_BLAST_IDENT as NVARCHAR(30)) + '/' +  replace(replace(replace(replace(DT2.HOLE_CODE ,'/''-',''),'(',''),')',''),' ','') as WencoId
@@ -648,9 +396,12 @@ where DT.DRILL_REC_IDENT in
 	,DT2.HAS_MANUAL_DEPTH
 	,DT2.AS_DRILLED_DEPTH 
 		) as T
-where T.Depth<>'0'  --and wencoid like '%DH/-1769/04%'--and T.DrillBlockNumber='972-18' and holeid like '%111'  --972-18 --and WencoId like 'DH/-1729/04%'--and holeid like '%142%'  --and T.DrillBlockNumber='850-117' --and holeid='086' 
+		where T.Depth<>'0'  --and wencoid like '%DH/-1769/04%'--and T.DrillBlockNumber='972-18' and holeid like '%111'  --972-18 --and WencoId like 'DH/-1729/04%'--and holeid like '%142%'  --and T.DrillBlockNumber='850-117' --and holeid='086' 
+		
 group by WencoId, DrillBlockNumber, HoleId, PlannedCollarY, PlannedCollarX, PlannedCollarZ, PlannedToeY, PlannedToeX, PlannedToeZ, EquipmentId, LicenseName, DrillHoleType,T.HoleIdCount,T.HoleId,DateTimeChange,T.DateTimeDelete ---,HAS_MANUAL_DEPTH
+
 UNION ALL
+
 select
 	cast (T.WencoId as NVARCHAR (40)) as WencoId,
 	T.DrillBlockNumber, 
@@ -686,6 +437,8 @@ select
 	T.DrillHoleType as DrillHoleType
 	--cast(IIF(T.HoleId like '%П%',3, T.DrillHoleType) as int) AS DrillHoleType
 	--,null HAS_MANUAL_DEPTH
+	
+	
 from (
 select distinct
 	N'DH/'+CAST(DT2.DRILL_BLAST_IDENT as NVARCHAR(30)) + '/' +  replace(replace(replace(replace(DT2.HOLE_CODE ,'/''-',''),'(',''),')',''),' ','') as WencoId
@@ -729,17 +482,417 @@ from [asugtk].[DRILL_TRANS_DELETED_ENTRIES] DT
 	 join asugtk.DRILL_BLAST DB on DT2.DRILL_BLAST_IDENT = DB.DRILL_BLAST_IDENT
 	join asugtk.DRILL_HOLE DH on DT2.DRILL_BLAST_IDENT = DH.DRILL_BLAST_IDENT and DH.HOLE_CODE=DT2.HOLE_CODE
 	join asugtk.LOCATION_BLAST_PATTERN c on DB.BLAST_LOCATION_SNAME = c.LOCATION_SNAME
+
 	 where DT2.END_TIMESTAMP is not null 
+	
 		) as T
-where 	DateTimeDelete>= @dateStart and DateTimeDelete<=@dateEnd and Depth<>'0' --and holeid='126' --and T.DrillBlockNumber='850-117' and holeid='086' and Depth<>'0' and  T.DrillBlockNumber='850-117'
+		where 		
+		DateTimeDelete>= @dateStart and DateTimeDelete<=@dateEnd and Depth<>'0' --and holeid='126' --and T.DrillBlockNumber='850-117' and holeid='086' and Depth<>'0' and  T.DrillBlockNumber='850-117'
+		
 group by WencoId, DrillBlockNumber, HoleId, PlannedCollarY, PlannedCollarX, PlannedCollarZ, PlannedToeY, PlannedToeX, PlannedToeZ, EquipmentId, LicenseName, DrillHoleType,T.HoleIdCount,T.HoleId,DateTimeChange
+		
 order by DateTimeDelete desc
+
 select dr.* from asugtk.DRILL_HOLE dr
 where DRILL_BLAST_IDENT='-1769' and HOLE_CODE like '04%'
 order by HOLE_CODE 
+
 select HOLE_CODE,HOLE_DEPTH,AS_DRILLED_DEPTH , dr.* from asugtk.DRILL_TRANS dr
 where DRILL_BLAST_IDENT='-1769' and HOLE_CODE like '04%'
 order by dr.HOLE_CODE 
+
+
+
+10. Выверка АРММ и МЕС
+
+АРММ:
+
+SELECT 
+       t.LoadLocation
+	  ,t.DumpLocation
+	  ,t.Material
+	  ,(CASE 
+	   WHEN t.Licence = 'ДиП м.Вернинское к.Вернинский' THEN 'Вернинское № ИРК 3464 БР'
+	   WHEN t.Licence = 'ДиП м.Верх.Кадал.к.Верхний Кадаликанский' THEN 'ВКадаликанскийлицензия'
+	   WHEN t.Licence = 'ДиП м.Кадаликанское к.Кадаликанский' THEN 'Кадаликанскийлицензия'
+	   WHEN t.Licence = 'ДиП м.Первенец к.Вернинский' THEN 'Первенец № ИРК 03455 БР'
+	   WHEN t.Licence = 'ДиП м.Смежный к.Вернинский' THEN 'Смежный № ИРК 03465 БР'
+	   END) as Licence
+	  ,t.LoadEquip
+	  ,SUM(t.MassApproved) as MassApproved
+	  ,SUM(t.VolumeApproved) as VolumeApproved
+	  ,SUM(t.MassAU) as MassAU
+FROM
+(
+SELECT
+       --TF.[Block] as LoadLocation--блок, для транспортировки со склада пустое
+	   TF.[LoadLocation] as LoadLocation --место погрузки, для карьера пустое
+      ,TF.[DumpLocation] --место выгрузки
+	  ,TF.[Material] --Тип руды
+	  ,SPP.SppName as Licence --СПП|Лицензия
+      ,LE.Position as LoadEquip --погрузчик
+      --,HE.Position as  --самосвал
+      --,[Turn]--Очередь
+      --,[Stage]--Этап
+      --,Sum(TF.[Mass]) MassFact
+      --,sum(TF.[Volume]) VolFact
+	  ,AP.[Mass] MassApproved
+	  ,AP.[Volume] VolumeApproved
+	  ,(AP.FractionAu * AP.Mass)  as MassAU
+	  --,sum([MassCycleTotal]) as MassCycleTotal
+      --,sum([VolumeCycleTotal]) as VolumeCycleTotal
+  FROM [MesMarkExchangeDb].[dbo].[TransportationWorkFact]  TF
+       LEFT JOIN MesMarkExchangeDb.dbo.Equipment LE ON TF.LoadEquip = LE.ElementCode
+	   LEFT JOIN MesMarkExchangeDb.dbo.TransportationWorkApproved AP ON AP.Id = TF.Id
+	   LEFT JOIN MesMarkExchangeDb.dbo.Licence SPP ON TF.SppElement = SPP.ElementCode
+       --Left join MesMarkExchangeDb.dbo.Equipment HE on TF.TransportEquip=HE.ElementCode
+WHERE DumpTime >= '2022-10-31 19:00:00' and DumpTime <='2022-11-30 19:00:00'
+and tf.StateId=3 and ap.StateId = 3
+and tf.LoadLocation is not null
+
+UNION ALL
+
+SELECT
+       TF.[Block] as LoadLocation --блок, для транспортировки со склада пустое
+	  --,TF.[LoadLocation] --место погрузки, для карьера пустое
+      ,TF.[DumpLocation] --место выгрузки
+	  ,TF.[Material] --Тип руды
+	  ,SPP.SppName as Licence --СПП|Лицензия
+      ,LE.Position as LoadEquip --погрузчик
+      --,HE.Position as  --самосвал
+      --,[Turn]--Очередь
+      --,[Stage]--Этап
+      --,Sum(TF.[Mass]) MassFact
+      --,sum(TF.[Volume]) VolFact
+	  ,AP.[Mass] MassApproved
+	  ,AP.[Volume] VolumeApproved
+	  ,(AP.FractionAu * AP.Mass)  as MassAU
+	  --,sum([MassCycleTotal]) as MassCycleTotal
+      --,sum([VolumeCycleTotal]) as VolumeCycleTotal
+  FROM [MesMarkExchangeDb].[dbo].[TransportationWorkFact]  TF
+       LEFT JOIN MesMarkExchangeDb.dbo.Equipment LE ON TF.LoadEquip = LE.ElementCode
+	   LEFT JOIN MesMarkExchangeDb.dbo.TransportationWorkApproved AP ON AP.Id = TF.Id
+	   LEFT JOIN MesMarkExchangeDb.dbo.Licence SPP ON TF.SppElement = SPP.ElementCode
+       --Left join MesMarkExchangeDb.dbo.Equipment HE on TF.TransportEquip=HE.ElementCode
+WHERE DumpTime >= '2022-10-31 19:00:00' and DumpTime <='2022-11-30 19:00:00'
+and tf.StateId=3 and ap.StateId = 3
+and tf.Block is not null
+
+UNION ALL
+
+SELECT
+	   TM.[LoadLocation] as LoadLocation --место погрузки, для карьера пустое
+      ,TM.[DumpLocation] --место выгрузки
+	  ,TM.[Material] --Тип руды
+	  ,TMSPP.SppName as Licence --СПП|Лицензия
+      ,EQ.Position as LoadEquip --погрузчик
+      --,HE.Position as  --самосвал
+      --,[Turn]--Очередь
+      --,[Stage]--Этап
+      --,Sum(TF.[Mass]) MassFact
+      --,sum(TF.[Volume]) VolFact
+	  ,TMAP.[Mass] MassApproved
+	  ,TMAP.[Volume] VolumeApproved
+	  ,(TMAP.FractionAu * TMAP.Mass)  as MassAU
+	  --,sum([MassCycleTotal]) as MassCycleTotal
+      --,sum([VolumeCycleTotal]) as VolumeCycleTotal
+	  FROM [MesMarkExchangeDb].[dbo].[TrammingWorkFact] TM
+	  LEFT JOIN MesMarkExchangeDb.dbo.Equipment EQ ON TM.Equip = EQ.ElementCode
+	  LEFT JOIN MesMarkExchangeDb.dbo.Licence TMSPP ON TMSPP.ElementCode = TM.SppElement
+	  LEFT JOIN MesMarkExchangeDb.dbo.TrammingWorkApproved TMAP ON TMAP.Id = TM.Id
+	  WHERE DumpEndTime >= '2022-10-31 19:00:00' and DumpEndTime <= '2022-11-30 19:00:00'
+	  and TM.StateId = 3 and TMAP.StateId = 1
+) t
+--and LoadLocation ='Штабель 3'
+--and Mass != MassCycleTotal
+GROUP BY t.LoadLocation, t.DumpLocation, t.Material, t.Licence, t.LoadEquip
+ORDER BY t.LoadLocation, t.DumpLocation, t.Material, t.Licence, t.LoadEquip
+
+
+
+МЕС:
+SET TIME ZONE 'Asia/Irkutsk';
+--EXPLAIN (ANALYZE, COSTS, VERBOSE, BUFFERS, FORMAT JSON)
+WITH TM(dt) as (VALUES(DATE_TRUNC('DAY', ('2022-11-30'::DATE)::TIMESTAMP)))
+Select --Наименование,
+--МатериалКомпонента,
+Точка_погрузки,
+Точка_разгрузки,
+Интматериал,
+Лицензия,
+Погрузчик,
+Sum(МассаТвердого) as Масса, 
+Sum(ЖидМасса) as Объем,
+--sum(КолВоЗолотаИЛИ_КолВоКомпонента) as КолВоЗолота
+--avg(СодержаниеЗолотаИЛИ_СодержаниеКомпонента) as СодержаниеКомпонента1ЗаМесяц,
+ --avg(СодержаниеВКомпоненте) as СодержаниеВКомпоненте,
+ sum(КолВоВКомпоненте) as КолВоЗолота
+ /*case 
+ 	when sum(КолВоВКомпоненте)<> null then sum(КолВоВКомпоненте)
+	when sum(КолВоВКомпоненте) is null then null
+	end as КолВоВКомпоненте*/
+ 
+from
+(SELECT
+	ac.elementcode,									/* Результрующие колонки */
+	am.starttime,
+	am.endtime,
+	--ac.elementcode as Наименование, 
+ PMP.transportationmovement_loadername as Погрузчик,
+-- anode2.ElementCode as Точка_погрузки,
+anode3.ElementCode as Точка_разгрузки,
+ T_Licenz.elementcode as Лицензия,
+ pgb.elementcode as Точка_погрузки,
+ mvint.elementcode as Интматериал,
+	mm.fullname as Материал,mn.fullname as МатериалКомпонента, mq.Fullname as Компонент,
+ 
+	
+
+	/* Парсинг Json для компонентов */
+	Coalesce((((SELECT Value FROM jsonb_array_elements(am.Amount::jsonb->'Attributes') WHERE jsonb_extract_path_text(Value, 'Id')='Value')->'Value'->>'Value')::float),0) as МассаТвердого,
+Coalesce((((SELECT Value FROM jsonb_array_elements(am.Extraamount::jsonb->'Attributes') 			WHERE jsonb_extract_path_text(Value, 'Id')='Value')->'Value'->>'Value')::float), 0) as ЖидМасса,
+Coalesce((((SELECT Value FROM json_array_elements(
+(SELECT Value FROM json_array_elements(ct.Value->'Attributes') as t1 					WHERE (t1.Value->>'Id')='Fraction')->'Value'->'Attributes') as t2
+				WHERE (t2.Value->>'Id')='Value')->'Value'->>'Value')::float), 0) as СодержаниеЗолотаИЛИ_СодержаниеКомпонента,
+Coalesce((((SELECT Value FROM json_array_elements(
+(SELECT Value FROM json_array_elements(ct.Value->'Attributes') as t1 					WHERE (t1.Value->>'Id')='Amount')->'Value'->'Attributes') as t2
+				WHERE (t2.Value->>'Id')='Value')->'Value'->>'Value')::float), 0) as КолВоЗолотаИЛИ_КолВоКомпонента,
+Coalesce((((Select Value from json_array_elements(
+(SELECT Value FROM json_array_elements(
+(SELECT Value FROM json_array_elements(ct.Value->'Attributes') as t1 				WHERE (t1.Value->>'Id')='Components')->'Value'->'Elements' ->0->'Attributes') as t2
+				WHERE (t2.Value->>'Id')='Fraction')->'Value'->'Attributes') as t3  			WHERE (t3.Value ->>'Id')='Value')->'Value'->>'Value')::float), 0) as СодержаниеВКомпоненте,
+Coalesce((((Select Value from json_array_elements(
+(SELECT Value FROM json_array_elements(
+(SELECT Value FROM json_array_elements(ct.Value->'Attributes') as t1 				WHERE (t1.Value->>'Id')='Components')->'Value'->'Elements' ->0->'Attributes') as t2
+				WHERE (t2.Value->>'Id')='Amount')->'Value'->'Attributes') as t3  			WHERE (t3.Value ->>'Id')='Value')->'Value'->>'Value')::float), 0) as КолВоВКомпоненте
+
+												/*Соединение Таблиц*/
+
+from accchannels_channel ac
+	join accmovements_movement am on ac.elementid=am.channel
+ 	left join public.pamovements_mixedpolygonentity PMP ON PMP.elementid = AM.elementid --Транспортировка
+
+ join accchannels_nodebase anode2 on anode2.elementid=pmp.transportationmovement_movementfrom 
+  join accchannels_nodebase anode3 on anode3.elementid=pmp.transportationmovement_movementto
+  inner join public.accmovements_nodeinstance ANI_Source ON ANI_Source.elementid = AM.source
+  inner join public.accmovements_nodeinstance ANI_Dest ON ANI_Dest.elementid = AM.destination
+ join paminingpolygon_miningpolygoncollection T_Licenz                              
+  ON T_Licenz.elementid = PMP.licencemix::json->'Elements'-> 0 -> 'Attributes'-> 0 ->'Value'->'Attributes'-> 0 ->'Value' ->>'Value'
+ join pageology_outline pgo on pgo.elementid=pmp.outline 
+ join pageology_block pgb on pgo.block=pgb.elementid
+ join mvmaterials_materialint mvint on mvint.elementid=pgo.integrationmaterial
+  --join pageology_level pgl on pgl.elementid=pgb.level
+	join material_material mm on mm.elementid = am.material
+	cross JOIN LATERAL json_array_elements(am.Components::json->'Elements') as ct
+	left join material_material mn ON mn.elementid = 
+(SELECT Value 
+	FROM json_array_elements(
+(SELECT Value FROM json_array_elements(ct.Value->'Attributes') as t1 WHERE (t1.Value->>'Id')='Material')->'Value'->'Attributes') as t2
+			WHERE (t2.Value->>'Id')='ElementId')->'Value'->>'Value' 
+left join material_material mq ON mq.elementid = 
+(Select Value from json_array_elements(
+(SELECT Value FROM json_array_elements(
+(SELECT Value FROM json_array_elements(ct.Value->'Attributes') as t1 				WHERE (t1.Value->>'id')='Components')->'Value'->'Elements' ->1->'Attributes') as t2
+				WHERE (t2.Value->>'id')='Material')->'Value'->'Attributes') as t3  			WHERE (t3.Value ->>'id')='ElementId')->'Value'->>'Value'
+
+												/*Условия и ограничения*/
+
+where  am.modelreference = 'o:site/app/RcAppProAcc/AccountingModelDetail'
+and  (am.endtime > date_trunc('Month',(SELECT dt FROM TM))-interval '5 hour' and am.endtime <= (select dt from tm)::timestamp + interval '19 hour'	)											/*Выбор необходимых хранилищ*/
+and
+ac.elementcode in ( 
+	'Взорванная горная масса (субконтура) --> Экскавация'    
+     ) --Массив каналов
+
+ UNION ALL
+ 
+ SELECT
+	ac.elementcode,									/* Результрующие колонки */
+	am.starttime,
+	am.endtime,
+ PMP.transportationmovement_loadername as Погрузчик,
+anode3.ElementCode as Точка_разгрузки,
+ T_Licenz.elementcode as Лицензия,
+ anode2.ElementCode as Точка_погрузки,
+ --pgb.elementcode as Точка_погрузки,
+ mvint.elementcode as Интматериал,
+	mm.fullname as Материал,mn.fullname as МатериалКомпонента, mq.Fullname as Компонент,
+ /*
+ 
+ ac.elementcode,									/* Результрующие колонки */
+	am.starttime,
+	am.endtime,
+ PMP.transportationmovement_loadername as Погрузчик,
+anode3.ElementCode as Точка_разгрузки,
+ T_Licenz.elementcode as Лицензия,
+ pgb.elementcode as Точка_погрузки,
+ mvint.elementcode as Интматериал,
+	mm.fullname as Материал,mn.fullname as МатериалКомпонента, mq.Fullname as Компонент,
+ 
+ */
+	
+
+	/* Парсинг Json для компонентов */
+	Coalesce((((SELECT Value FROM jsonb_array_elements(am.Amount::jsonb->'Attributes') WHERE jsonb_extract_path_text(Value, 'Id')='Value')->'Value'->>'Value')::float),0) as МассаТвердого,
+Coalesce((((SELECT Value FROM jsonb_array_elements(am.Extraamount::jsonb->'Attributes') 			WHERE jsonb_extract_path_text(Value, 'Id')='Value')->'Value'->>'Value')::float), 0) as ЖидМасса,
+Coalesce((((SELECT Value FROM json_array_elements(
+(SELECT Value FROM json_array_elements(ct.Value->'Attributes') as t1 					WHERE (t1.Value->>'Id')='Fraction')->'Value'->'Attributes') as t2
+				WHERE (t2.Value->>'Id')='Value')->'Value'->>'Value')::float), 0) as СодержаниеЗолотаИЛИ_СодержаниеКомпонента,
+Coalesce((((SELECT Value FROM json_array_elements(
+(SELECT Value FROM json_array_elements(ct.Value->'Attributes') as t1 					WHERE (t1.Value->>'Id')='Amount')->'Value'->'Attributes') as t2
+				WHERE (t2.Value->>'Id')='Value')->'Value'->>'Value')::float), 0) as КолВоЗолотаИЛИ_КолВоКомпонента,
+Coalesce((((Select Value from json_array_elements(
+(SELECT Value FROM json_array_elements(
+(SELECT Value FROM json_array_elements(ct.Value->'Attributes') as t1 				WHERE (t1.Value->>'Id')='Components')->'Value'->'Elements' ->0->'Attributes') as t2
+				WHERE (t2.Value->>'Id')='Fraction')->'Value'->'Attributes') as t3  			WHERE (t3.Value ->>'Id')='Value')->'Value'->>'Value')::float), 0) as СодержаниеВКомпоненте,
+Coalesce((((Select Value from json_array_elements(
+(SELECT Value FROM json_array_elements(
+(SELECT Value FROM json_array_elements(ct.Value->'Attributes') as t1 				WHERE (t1.Value->>'Id')='Components')->'Value'->'Elements' ->0->'Attributes') as t2
+				WHERE (t2.Value->>'Id')='Amount')->'Value'->'Attributes') as t3  			WHERE (t3.Value ->>'Id')='Value')->'Value'->>'Value')::float), 0) as КолВоВКомпоненте
+
+												/*Соединение Таблиц*/
+
+from accchannels_channel ac
+	join accmovements_movement am on ac.elementid=am.channel
+ 	left join public.pamovements_mixedpolygonentity PMP ON PMP.elementid = AM.elementid --Транспортировка
+
+ join accchannels_nodebase anode2 on anode2.elementid=pmp.transportationmovement_movementfrom 
+  join accchannels_nodebase anode3 on anode3.elementid=pmp.transportationmovement_movementto
+  inner join public.accmovements_nodeinstance ANI_Source ON ANI_Source.elementid = AM.source
+  inner join public.accmovements_nodeinstance ANI_Dest ON ANI_Dest.elementid = AM.destination
+ join paminingpolygon_miningpolygoncollection T_Licenz                              
+  ON T_Licenz.elementid = PMP.licencemix::json->'Elements'-> 0 -> 'Attributes'-> 0 ->'Value'->'Attributes'-> 0 ->'Value' ->>'Value'
+ join pageology_outline pgo on pgo.elementid=pmp.outline 
+ join pageology_block pgb on pgo.block=pgb.elementid
+ join mvmaterials_materialint mvint on mvint.elementid=pgo.integrationmaterial
+  --join pageology_level pgl on pgl.elementid=pgb.level
+	join material_material mm on mm.elementid = am.material
+	cross JOIN LATERAL json_array_elements(am.Components::json->'Elements') as ct
+	left join material_material mn ON mn.elementid = 
+(SELECT Value 
+	FROM json_array_elements(
+(SELECT Value FROM json_array_elements(ct.Value->'Attributes') as t1 WHERE (t1.Value->>'Id')='Material')->'Value'->'Attributes') as t2
+			WHERE (t2.Value->>'Id')='ElementId')->'Value'->>'Value' 
+left join material_material mq ON mq.elementid = 
+(Select Value from json_array_elements(
+(SELECT Value FROM json_array_elements(
+(SELECT Value FROM json_array_elements(ct.Value->'Attributes') as t1 				WHERE (t1.Value->>'id')='Components')->'Value'->'Elements' ->1->'Attributes') as t2
+				WHERE (t2.Value->>'id')='Material')->'Value'->'Attributes') as t3  			WHERE (t3.Value ->>'id')='ElementId')->'Value'->>'Value'
+
+												/*Условия и ограничения*/
+
+where  am.modelreference = 'o:site/app/RcAppProAcc/AccountingModelDetail'
+and  (am.endtime > date_trunc('Month',(SELECT dt FROM TM))-interval '5 hour' and am.endtime <= (select dt from tm)::timestamp + interval '19 hour'	)											/*Выбор необходимых хранилищ*/
+and
+ac.elementcode in ( 
+	
+      'Штабель 0 --> Экскавация на складе',
+      'Штабель 1 --> Экскавация на складе',
+      'Штабель 1.1 --> Экскавация на складе',
+      'Штабель 11 --> Экскавация на складе',
+      'Штабель 15.1 --> Экскавация на складе',
+      'Штабель 15.2 --> Экскавация на складе',
+      'Штабель 15.3 --> Экскавация на складе',
+      'Штабель 15.4 --> Экскавация на складе',
+      'Штабель 2 --> Экскавация на складе',
+      'Штабель 2.1 --> Экскавация на складе',
+      'Штабель 2.2 --> Экскавация на складе',
+      'Штабель 2.3 --> Экскавация на складе',
+      'Штабель 2.4 --> Экскавация на складе',
+      'Штабель 3 --> Экскавация на складе',
+      'Штабель 4 --> Экскавация на складе',
+      'Штабель 5.1-- > Экскавация(втор.дробл.)(0139)',
+      'Склад 11 --> Экскавация на складе',
+      'Склад 13 --> Экскавация на складе',
+      'Склад 14 --> Экскавация на складе'
+     ) --Массив каналов
+ UNION ALL
+SELECT
+	ac.elementcode,									/* Результрующие колонки */
+	am.starttime,
+	am.endtime,
+	--ac.elementcode as Наименование, 
+ PMP.transportationmovement_loadername as Погрузчик,
+-- anode2.ElementCode as Точка_погрузки,
+anode3.ElementCode as Точка_разгрузки,
+ T_Licenz.elementcode as Лицензия,
+ pgb.elementcode as Точка_погрузки,
+ mvint.elementcode as Интматериал,
+	mm.fullname as Материал,
+	null as МатериалКомпонента, 
+	null as Компонент,
+ 
+	
+
+	/* Парсинг Json для компонентов */
+	Coalesce((((SELECT Value FROM jsonb_array_elements(am.Amount::jsonb->'Attributes') WHERE jsonb_extract_path_text(Value, 'Id')='Value')->'Value'->>'Value')::float),0) as МассаТвердого,
+Coalesce((((SELECT Value FROM jsonb_array_elements(am.Extraamount::jsonb->'Attributes') 			WHERE jsonb_extract_path_text(Value, 'Id')='Value')->'Value'->>'Value')::float), 0) as ЖидМасса,
+ null as СодержаниеЗолотаИЛИ_СодержаниеКомпонента,
+ null as КолВоЗолотаИЛИ_КолВоКомпонента,
+ null as СодержаниеВКомпоненте,
+ null as КолВоВКомпоненте
+ 
+ 
+/*Coalesce((((SELECT Value FROM json_array_elements(
+(SELECT Value FROM json_array_elements(ct.Value->'Attributes') as t1 					WHERE (t1.Value->>'Id')='Fraction')->'Value'->'Attributes') as t2
+				WHERE (t2.Value->>'Id')='Value')->'Value'->>'Value')::float), 0) as СодержаниеЗолотаИЛИ_СодержаниеКомпонента,
+Coalesce((((SELECT Value FROM json_array_elements(
+(SELECT Value FROM json_array_elements(ct.Value->'Attributes') as t1 					WHERE (t1.Value->>'Id')='Amount')->'Value'->'Attributes') as t2
+				WHERE (t2.Value->>'Id')='Value')->'Value'->>'Value')::float), 0) as КолВоЗолотаИЛИ_КолВоКомпонента,
+Coalesce((((Select Value from json_array_elements(
+(SELECT Value FROM json_array_elements(
+(SELECT Value FROM json_array_elements(ct.Value->'Attributes') as t1 				WHERE (t1.Value->>'Id')='Components')->'Value'->'Elements' ->0->'Attributes') as t2
+				WHERE (t2.Value->>'Id')='Fraction')->'Value'->'Attributes') as t3  			WHERE (t3.Value ->>'Id')='Value')->'Value'->>'Value')::float), 0) as СодержаниеВКомпоненте,
+Coalesce((((Select Value from json_array_elements(
+(SELECT Value FROM json_array_elements(
+(SELECT Value FROM json_array_elements(ct.Value->'Attributes') as t1 				WHERE (t1.Value->>'Id')='Components')->'Value'->'Elements' ->0->'Attributes') as t2
+				WHERE (t2.Value->>'Id')='Amount')->'Value'->'Attributes') as t3  			WHERE (t3.Value ->>'Id')='Value')->'Value'->>'Value')::float), 0) as КолВоВКомпоненте*/
+
+												/*Соединение Таблиц*/
+
+from accchannels_channel ac
+	join accmovements_movement am on ac.elementid=am.channel
+ 	left join public.pamovements_mixedpolygonentity PMP ON PMP.elementid = AM.elementid --Транспортировка
+
+ join accchannels_nodebase anode2 on anode2.elementid=pmp.transportationmovement_movementfrom 
+  join accchannels_nodebase anode3 on anode3.elementid=pmp.transportationmovement_movementto
+  inner join public.accmovements_nodeinstance ANI_Source ON ANI_Source.elementid = AM.source
+  inner join public.accmovements_nodeinstance ANI_Dest ON ANI_Dest.elementid = AM.destination
+ join paminingpolygon_miningpolygoncollection T_Licenz                              
+  ON T_Licenz.elementid = PMP.licencemix::json->'Elements'-> 0 -> 'Attributes'-> 0 ->'Value'->'Attributes'-> 0 ->'Value' ->>'Value'
+ join pageology_outline pgo on pgo.elementid=pmp.outline 
+ join pageology_block pgb on pgo.block=pgb.elementid
+ join mvmaterials_materialint mvint on mvint.elementid=pgo.integrationmaterial
+  --join pageology_level pgl on pgl.elementid=pgb.level
+	join material_material mm on mm.elementid = am.material
+	/*cross JOIN LATERAL json_array_elements(am.Components::json->'Elements') as ct
+	left join material_material mn ON mn.elementid = 
+(SELECT Value 
+	FROM json_array_elements(
+(SELECT Value FROM json_array_elements(ct.Value->'Attributes') as t1 WHERE (t1.Value->>'Id')='Material')->'Value'->'Attributes') as t2
+			WHERE (t2.Value->>'Id')='ElementId')->'Value'->>'Value' 
+left join material_material mq ON mq.elementid = 
+(Select Value from json_array_elements(
+(SELECT Value FROM json_array_elements(
+(SELECT Value FROM json_array_elements(ct.Value->'Attributes') as t1 				WHERE (t1.Value->>'id')='Components')->'Value'->'Elements' ->1->'Attributes') as t2
+				WHERE (t2.Value->>'id')='Material')->'Value'->'Attributes') as t3  			WHERE (t3.Value ->>'id')='ElementId')->'Value'->>'Value'*/
+
+												/*Условия и ограничения*/
+
+where  am.modelreference = 'o:site/app/RcAppProAcc/AccountingModelDetail'
+and  (am.endtime > date_trunc('Month',(SELECT dt FROM TM))-interval '5 hour' and am.endtime <= (select dt from tm)::timestamp + interval '19 hour'	)											/*Выбор необходимых хранилищ*/
+and
+ac.elementcode in ( 
+	      'Взорванная горная масса (Кадаликанское) --> Экскавация (Кадаликанское)', 
+      'Взорванная горная масса (В. Кадаликанское) --> Экскавация (В. Кадаликанское)'
+     
+     )
+
+)  as q 
+group by 1,2,3,4,5
+order by 1,2,3,4,5
+
+
 
 11.
 select pgdb.number, bh.number, bh.elementid, accm.starttime, accm.endtime--, accm.amount
@@ -757,9 +910,13 @@ join accmovements_movement accm on accm.elementid = pdb.elementid and accm.model
 where accm.endtime >= '2022-10-31 19:00:00 +08' and accm.endtime <= '2022-11-30 19:00:00 +08')
 order by pgdb.number, bh.number
 
+
+
+
+
 --------------------
 
-Select bp.elementId,pit."name", bh.elementid as boreholeId, bh.number, ni.elementid as NiElementId
+Select bp.elementId,pit.'name', bh.elementid as boreholeId, bh.number, ni.elementid as NiElementId
 , (((SELECT Value
              FROM jsonb_array_elements(ni.store_amount::jsonb -> 'Attributes')
              WHERE jsonb_extract_path_text(Value, 'Id') = 'Value') -> 'Value' ->> 'Value')::float) as store_amount
@@ -999,12 +1156,23 @@ and tb.borehole='8ade42019e9644a5bc396f2237fe781e' and ch.elementid='4b8e0db61bd
 ('096e9152a8234db9862d9aa888563107'/*,
 '4b8e0db61bd94814979f77609cce53a9'*/)
 
+
+
+
+
+
+---------------------------------------------
+
+
+
+
 ----------------------Обновленный запрос интегра для скважин 
 DECLARE @dateStart as datetime, @dateEnd as datetime, @offset as int;
 /*
 SET @offset = (select top 1 Offset from [asugtk].TimezoneAdjustment);
 SET @dateStart = DATEADD(MINUTE, -@timeOffsetBack, @timeMark);
 SET @dateEnd = DATEADD(MINUTE, @timeOffsetDir, @dateStart);*/
+
 
 SET @dateStart = '2023-08-10 19:00:00';
 SET @dateEnd = '2023-10-11 19:00:00';
@@ -1091,6 +1259,8 @@ select
 	--cast(IIF(T.HoleId like '%П%',3, T.DrillHoleType) as int) AS DrillHoleType
 	--,T.HAS_MANUAL_DEPTH
 	,T.IS_REDRILL  as IS_REDRILL 
+	
+	
 from (
 select distinct
 	--N'DH/'+CAST(DT2.DRILL_BLAST_IDENT as NVARCHAR(30)) + '/' +  replace(replace(replace(replace(DT2.HOLE_CODE ,'/''-',''),'(',''),')',''),' ','') as WencoId,
@@ -1184,6 +1354,9 @@ where DT.DRILL_REC_IDENT in
 group by WencoId, DrillBlockNumber, HoleId, PlannedCollarY, PlannedCollarX, PlannedCollarZ, PlannedToeY, PlannedToeX, PlannedToeZ, EquipmentId, LicenseName, DrillHoleType,T.HoleIdCount,T.HoleId,DateTimeChange,T.DateTimeDelete,T.IS_REDRILL --WencoId2 ---,HAS_MANUAL_DEPTH
 
 ) as T
+
+
+
 UNION ALL
 
 select  
@@ -1322,6 +1495,8 @@ group by WencoId, DrillBlockNumber, HoleId, PlannedCollarY, PlannedCollarX, Plan
 	  ) as T	
 order by DateTimeDelete desc
 
+
+
 --------------------
 
 Запас уже существует. id: fddd8d835f5e4a6eb126929349dfdb10; code: Store Карьер Вернинский/800/800-77//П084|c19ca8c50d4348f0a160f81269fab4f6; timeRange: [2023-10-09T19:00:00.0000000+08:00 - 2023-10-10T07:00:00.0000000+08:00]; previousStore: [ - ]; storage: [Пробуренные скважины - 98fd8358b52b4b118e8d3a22ea20ff5c]; storePlace: Карьер Вернинский/800/800-77//П084|8f2d00f62fa94673b687b937b61790ce|2023-10-09T19:00:00.0000000+08:00-]. Store: code: Store |738308c349b64445a9c5f49d161d59f7; timeRange: [2023-10-09T19:00:00.0000000+08:00 - ]; previousStore: [ - ]; storage: [Пробуренные скважины - 98fd8358b52b4b118e8d3a22ea20ff5c]; storePlace: Карьер Вернинский/800/800-77//П084|8f2d00f62fa94673b687b937b61790ce|2023-10-09T19:00:00.0000000+08:00-];
@@ -1331,6 +1506,7 @@ order by DateTimeDelete desc
 Name: InvalidOperationException
 Message: Fault operation. Ошибки валидации:
 Запас уже существует. id: fddd8d835f5e4a6eb126929349dfdb10; code: Store Карьер Вернинский/800/800-77//П084|c19ca8c50d4348f0a160f81269fab4f6; timeRange: [2023-10-09T19:00:00.0000000+08:00 - 2023-10-10T07:00:00.0000000+08:00]; previousStore: [ - ]; storage: [Пробуренные скважины - 98fd8358b52b4b118e8d3a22ea20ff5c]; storePlace: Карьер Вернинский/800/800-77//П084|8f2d00f62fa94673b687b937b61790ce|2023-10-09T19:00:00.0000000+08:00-]. Store: code: Store |738308c349b64445a9c5f49d161d59f7; timeRange: [2023-10-09T19:00:00.0000000+08:00 - ]; previousStore: [ - ]; storage: [Пробуренные скважины - 98fd8358b52b4b118e8d3a22ea20ff5c]; storePlace: Карьер Вернинский/800/800-77//П084|8f2d00f62fa94673b687b937b61790ce|2023-10-09T19:00:00.0000000+08:00-];
+
 
 Name: Exception
 Message: Не удалось сохранить Stores.
@@ -1382,8 +1558,8 @@ select * from
 {{gatewayUrl}}/rc-mag-int-restgateway/sys/CallUi?applicationId=RestGateway&callableReference=o:RcAppProAcc/UiManager[GetStorePlaceByElementId]
 
 {
-    "ModelReference": "o:site/app/RcAppProAcc/AccountingModelDetail",
-    "Id": "b936333d76c74fc5a8dd7cfd2ecc4e39"  -- места хранения
+    'ModelReference': 'o:site/app/RcAppProAcc/AccountingModelDetail',
+    'Id': 'b936333d76c74fc5a8dd7cfd2ecc4e39'  -- места хранения
 }
 
 
@@ -1458,9 +1634,9 @@ select acc.elementid,acc.channel,acc.material,acc.starttime, mm.elementcode
 
 		)
 /*
-"2f7d1dd2cfb746cbacc79a5c2be1b71d"
-"3831bf15569a4d0d9895b1e0dc360a4b"
-"6f68acb8cb9646eea05748647c00bdc0"
+'2f7d1dd2cfb746cbacc79a5c2be1b71d'
+'3831bf15569a4d0d9895b1e0dc360a4b'
+'6f68acb8cb9646eea05748647c00bdc0'
 */
 
 -----START
@@ -1879,6 +2055,9 @@ order by tb.borehole
 апдейтим время окончания сторе плейс
 апдейтим время начала и окончания на запасах
 
+
+Если есть запасы закрытые и storeplace тоже закрытый , то через апдейтсторе и апдейт стореплейс открываем и ждем пересчета - заряжаем
+
 ----------------
 
 
@@ -1932,24 +2111,51 @@ limit 100
 
 --- повторное отправка события
 
-SELECT  s."Id",s."EventRef", s."DeliverRef", s."EventId"    ,*
-	FROM public."EventInstanceDbtos" EVENT
-	join public."SubscriptionDbtos" s on s."Id" = EVENT."EventId"
-	where (EVENT."EventId" ='1452' or  EVENT."EventId" ='39') 
+SELECT  s.'Id',s.'EventRef', s.'DeliverRef', s.'EventId'    ,*
+	FROM public.'EventInstanceDbtos' EVENT
+	join public.'SubscriptionDbtos' s on s.'Id' = EVENT.'EventId'
+	where (EVENT.'EventId' ='1452' or  EVENT.'EventId' ='39') 
 	--and data ilike '%1822d415c91e4429a7ca67265b0445e1%'
 	
-	order by "RaisedAt" desc
+	order by 'RaisedAt' desc
 	
 	select * from
-	public."DeliverDbtos"
-	where "EventInstanceId"='1452'
-	--"IsDelivered"  false
-	--"NextAttemptAfterAt" чуьть больше текущего
+	public.'DeliverDbtos'
+	where 'EventInstanceId'='1452'
+	--'IsDelivered'  false
+	--'NextAttemptAfterAt' чуьть больше текущего
 	
 	select * from 
-	public."DeliverAttemptDbtos"
-	where "DeliverId" = '2972'
+	public.'DeliverAttemptDbtos'
+	where 'DeliverId' = '2972'
 	-- тут смотреть сколько раз отправлялось событие
+	
+	
+--событие   "PolyusMesMbAsuSzmService"	"Событие о фактический скважинах"
+
+select
+		EventDbtos."OpenAt" OpenAt,
+		EventDbtos."IsOpen" IsOpen,
+		EventDbtos."OwnerAppId",
+		EventDbtos."EventRef"  EventDbtos_EventRef,
+		EventDbtos."Label" EventDbtos_Label,
+		EventDbtos."DataTypeRef" EventDbtos_DataTypeRef,
+		DeliverDb."DeliverTargetId" DeliverDb_DeliverTargetId,
+		DeliverDb."LastAttemptEndAt" DeliverDb_LastAttemptEndAt ,
+		DeliverDb."NextAttemptAfterAt" DeliverDb_NextAttemptAfterAt,
+		
+		EvIDd."Id" EvIDd_ID,
+		EvIDd."EventId" EvIDd_EventId,
+		EvIDd."RaisedAt"  EvIDd_RaisedAt,
+		EvIDd."SourceAppId" EvIDd_SourceAppId,
+		
+		EvIDd."Data" EvIDd_Data_message
+				from public."EventInstanceDbtos"  EvIDd
+		join public."DeliverDbtos"  DeliverDb on DeliverDb."EventInstanceId"=EvIDd."Id"
+		join public."EventDbtos" EventDbtos on EventDbtos."Id"=EvIDd."EventId"
+		where EvIDd."EventId" =3 
+		--and EvIDd."SourceAppId"='PolyusMesMbAsuSzmService'	
+	
 	
 	
 	--------------------------------------------
@@ -2099,7 +2305,7 @@ and ch.consumedmaterial_priority is null
 
 
 ----------------------------------
-Поменять блока
+
 select * from
 public.pageology_block
 where name ilike '%AD%'
@@ -2128,12 +2334,325 @@ where elementid in (
 )
 
 
+-------------------------
+Найти цепочку пмв-заряжание
+
+select b.number, tb.elementid,tb.ischarged,ch.work,ch.elementid ch_id,ch.consumedmaterial_priority
+from
+public.dbo_toblastborehole tb
+join dbo_borehole b on tb.borehole=b.elementid
+full join public.dbomovements_chargingborehole ch on ch.borehole=b.elementid
+full join public.accmovements_movement acc on acc.elementid=ch.elementid
+where tb.project='a63d5247baea4296867bd4a0ea21bde3' and work is null
+--ch.consumedmaterial_priority is null
+order by b.number asc
+
+
+
+-------------------
+
+апдейт  JSON plandistributedcharge
+
+
+select b.number ,mm.elementcode,mm.elementid mm_id,pl.elementid,pl.plandistributedcharge
+from 
+public.dbo_toblastborehole tb
+join public.dbo_planchargematerial pl on tb.elementid=pl.toblastborehole
+join public.dbo_borehole b on b.elementid=tb.borehole
+join public.material_material mm on pl.material=mm.elementid
+where pl.project='d618f027298b422796c1408ecad1563d' and mm.elementid in ('1c8fec78f78045779318b4434f95ceec'/*,'1c8fec78f78045779318b4434f95ceec'*/)
+--and (b.number between '088' and '092' or b.number between '100' and '104' or b.number between '110' and '115' or b.number between '126' and '148' )
+order by b.number
+
+
+update public.dbo_planchargematerial
+set plandistributedcharge='{'ElementTypeReference':'s:PolyusMesPa/Types/DistributedCharge','IsDictionary':false,'Elements':[{'Attributes':[{'Value':{'Value':520.00,'TypeReference':'s:sys/core/types/Float'},'Id':'Amount'},{'Value':{'Value':1,'TypeReference':'s:sys/core/types/Integer'},'Id':'Priority'}],'DynamicAttributes':{},'TypeReference':'s:PolyusMesPa/Types/DistributedCharge'}],'ElementsDictionary':{},'LookupKey':null,'TypeReference':'a:s:PolyusMesPa/Types/DistributedCharge'}'
+where elementid in (
+select pl.elementid
+from 
+public.dbo_toblastborehole tb
+join public.dbo_planchargematerial pl on tb.elementid=pl.toblastborehole
+join public.dbo_borehole b on b.elementid=tb.borehole
+join public.material_material mm on pl.material=mm.elementid
+where pl.project='d618f027298b422796c1408ecad1563d' and mm.elementid in ('1c8fec78f78045779318b4434f95ceec'/*,'1c8fec78f78045779318b4434f95ceec'*/)
+--and b.number between '042' and '047' 
+and	b.number = '160'
+	--and (b.number between '075' and '086'  )
+order by b.number
+)
+
+--------------------
+Получить дату и смену заряженных/не заряжанных toblastborehole включенных в Blastproject
+
+select b.number,
+p.number,
+tb.ischarged ischarged,
+tb.project blast_id , 
+tb.elementid toblastborehole_id,
+ch.elementid chargingwork_id,
+char.work char_work,
+ch.shiftdef,
+shift.proday, 
+tt.elementcode
+from
+public.dbo_toblastborehole tb
+full join dbo_borehole b on b.elementid=tb.borehole
+full join public.dbo_plannedborehole p on p.elementid=tb.plannedborehole
+full join public.dbomovements_chargingborehole char on char.borehole=tb.borehole
+full join public.dbo_chargingwork ch on char.work=ch.elementid
+full join public.dbo_shiftdef shift on shift.elementid=ch.shiftdef
+full  join tree_treenode tt on tt.elementid = shift.timesdef
+where tb.project='407ca2b4ab614d439806aff9326c25e3'
+
+
+---------------------------
+
+
+-- select для выборки сущностей без borehole из dbomovements_chargingborehole по  char.work , при 
+select 
+char.elementid,
+char.borehole ch_b,
+tb.borehole tb_b,
+b.elementid b_b,
+char.consumedmaterial_priority,
+* 
+
+from 
+public.dbomovements_chargingborehole char 
+full join public.dbo_toblastborehole tb on tb.borehole=char.borehole
+full join dbo_borehole b on b.elementid=tb.borehole
+where char.work='bc8873931fe14d55a88fcd3a71d47c5a'
+and char.modelreference = 'o:site/app/RcAppProAcc/AccountingModelDetail'
+and b.elementid is null
+
+
+------------------------
+Работа по заряжани , дата смена, проект, взрывной блок
+
+select distinct 
+char.work char_work,
+ch.shiftdef,
+shift.proday,
+tt.elementcode,
+blast.number
+from
+public.dbo_toblastborehole tb
+left join dbo_borehole b on b.elementid=tb.borehole
+join public.dbo_blastproject bl on tb.project=bl.elementid
+join public.pageology_blastblock blast on blast.elementid=bl.block
+full join public.dbo_plannedborehole p on p.elementid=tb.plannedborehole
+full join public.dbomovements_chargingborehole char on char.borehole=tb.borehole
+full join public.dbo_chargingwork ch on char.work=ch.elementid
+full join public.dbo_shiftdef shift on shift.elementid=ch.shiftdef
+full  join tree_treenode tt on tt.elementid = shift.timesdef
+full join public.accmovements_movement acc on acc.elementid=char.elementid
+
+where  
+--tb.project='685c061ca5534f2499c9ae1ce9984328' 
+-- and 
+blast.number='1110-7'
+--and tb.ischarged 
+--and ch.elementid  is null 
+--and ch.templatereference='s:PolyusMesPa/Domains/DboMovements/ConsumedMaterial'
+--267e5c9b14f940b38dd351e8aef36488
+
+--order by tb.ischarged desc
+
+починить:
+
+1110-20 заряжание за 05.07 и 07.05 - завдоилось
+
+
+select 
+char.elementid,
+char.borehole ch_b,
+tb.borehole tb_b,
+b.elementid b_b,
+char.consumedmaterial_priority,
+b.number,
+'/////',
+* 
+
+from 
+public.dbomovements_chargingborehole char 
+full join public.dbo_toblastborehole tb on tb.borehole=char.borehole
+full join dbo_borehole b on b.elementid=tb.borehole
+
+where --tb.project='04365f311e0146f6b1815af8311f1f74'
+char.work='e75d584bcc1e4593b0a233889af43521'
+and char.modelreference = 'o:site/app/RcAppProAcc/AccountingModelDetail'
+and char.templatereference='s:PolyusMesPa/Domains/DboMovements/ConsumedMaterial'
+and b.number in (
+'058','067','085'
+--'084','085','066','076','058','075','067','083','049','006'
+)
+
+
+-----найти material на store и mov по borehole
+
+
+select pr.borehole,b.number,pr.elementid,mm.elementcode as material_movemnts, nd.elementid nd_id, bstore.elementid d_id,mm2.elementcode as material_store, * 
+    from public.dbo_borehole b 
+    join public.dbomovements_producedrilledborehole pr on b.elementid=pr.borehole
+    join public.accmovements_movement acc on  pr.elementid=acc.elementid
+    join public.material_material mm on acc.material=mm.elementid
+    join public.accmovements_nodeinstance nd on acc.batchid=nd.batchid
+	full join public.dbomovements_boreholestore bstore on bstore.elementid=nd.elementid
+	full join public.material_material mm2 on nd.store_material=mm2.elementid
+    where b.elementid in (
+		'64dd04e4633b47cd98202fc734c2f54f', 
+		'1cf9d97987e840a9b25f3af41e56aeb5',
+		'0458f7fe593348d7a108ee12b2ca0261',
+		'fd2fb777202b471db6e5c8d232c6d23e',
+		'37471d17a5db4311a9dbd23809bfcc0d'
+		)
+		--and mm2.elementcode='Скважины руды (1028255)'
+		
+		
+		
+		
+		
+		--- найти в логе отправку в асу сзм со стороны бвр
+		
+		
+Send2ToBlastBoreholeEvent|ProxySend|eventMessage:[{"BlastBlock":{"Number":"760-18"
 
 
 
 
 
+select * from accmovements_storeplace as2 
+where "storage" = '652e11b1db1043a091daa9a75f549756'
+and as2."name" ilike '%730-0208-3%';
 
 
 
+
+----------------найти разницу между бурением и браком, + заряжание фактическое(без брака)
+
+SET TIME ZONE 'Asia/Irkutsk';
+
+SELECT 
+	--ДатаБурения,
+	--Смена,
+	--position,
+	SUM(Пробуренно) AS пробурено,
+	SUM(Пробуренно_брак) AS пробурено_брак,
+	SUM(Пробуренно) - SUM(Пробуренно_брак) AS разница
+FROM (
+	SELECT 
+		am.elementid AS am_elementid,
+		PDB.borehole AS PDB_borehole,
+		PDB.work AS PDB_work,
+		to_char(sd.proday, 'DD.MM.YYYY') AS ДатаБурения,
+		sd.proday AS date,
+		tt.elementcode AS Смена,
+		erp_t.position AS position,
+		db.number AS Блок,
+		BH.number AS Скважина,
+		BH.isdefective AS ПризнакБрака,
+		COALESCE(SUM(((SELECT Value
+				FROM jsonb_array_elements(am.Amount::jsonb->'Attributes')
+				WHERE jsonb_extract_path_text(Value, 'Id') = 'Value') -> 'Value' ->> 'Value')::float), 0) AS Пробуренно,
+		COALESCE(SUM(CASE WHEN BH.isdefective = true THEN 
+				((SELECT Value
+					FROM jsonb_array_elements(am.Amount::jsonb->'Attributes')
+					WHERE jsonb_extract_path_text(Value, 'Id') = 'Value') -> 'Value' ->> 'Value')::float 
+			ELSE 0 END), 0) AS Пробуренно_брак
+	FROM dbo_drillingwork DW
+		LEFT JOIN erpresources_resource rr ON dw.machine = rr.elementid
+		LEFT JOIN public.erpequipment_technicalplace erp_t ON erp_t.processsegment = rr.elementid
+		LEFT JOIN dbo_shiftdef sd ON sd.elementid = dw.shift
+		LEFT JOIN dbomovements_producedrilledborehole PDB ON pdb.work = dw.elementid
+		LEFT JOIN dbo_borehole bh ON bh.elementid = pdb.borehole
+		LEFT JOIN pageology_drillblock db ON db.elementid = bh.drillblock
+		LEFT JOIN accmovements_movement am ON am.elementid = pdb.elementid
+		LEFT JOIN tree_treenode tt ON tt.elementid = sd.timesdef  -- Добавлен JOIN для таблицы tt
+	WHERE sd.proday::date >= '2024-10-01' AND sd.proday::date <= '2024-11-01'
+		AND db.number = '972-53'
+	GROUP BY ДатаБурения, Блок, Скважина, Смена, ПризнакБрака, position, am.elementid, bh.elementid,pdb.borehole,pdb.work,sd.proday
+) AS t
+--GROUP BY ДатаБурения, Смена, position
+--ORDER BY ДатаБурения, Смена, position;
+
+
+
+
+
+исключение при формировании BoreholeDto, plandistributedcharge Value null для amount
+
+
+select plandistributedcharge, * from
+public.dbo_planchargematerial
+where elementid in (
+
+'b81e9d64a9e246fe8626c7dda96745c5',
+'664830a143d0432b9092abfed6f758f8',
+'cbff871966554a35abf44681a2fbc583',
+'95d1585f88dc458a95df6002a394173f',
+'50861388ff1749a0a5aa88b9b074f042',
+'5faa922d06f94eaa8deb5b44e727c681',
+'6aa294f19b3240ea91f78bd5263256d4',
+'d186c58cdbe8462cbec2e6ff1c035628'
+
+)
+
+
+парсинг
+
+SELECT
+    [raw_data],
+    CAST([raw_data] AS XML).value('(/mv_drill_project/block/@BlockArea)[1]', 'nvarchar(max)') AS BlockArea,
+    CAST([raw_data] AS XML).value('(/mv_drill_project/block/@HeightLedg)[1]', 'nvarchar(max)') AS HeightLedg,
+    [message_id],
+    [flow_id],
+    [description],
+    [state],
+    [create_date],
+    [state_date],
+    [transformed_data],
+    [is_sync],
+    [handling_result_text],
+    [col_used_try_send_message],
+    [time_last_try_send_message],
+    [raw_data],
+    [linked_to_message_id]
+ --   CAST([raw_data] AS XML).value('(/mv_drill_project/block/@BlockArea)[1]', 'nvarchar(max)') AS BlockArea,
+   -- CAST([raw_data] AS XML).value('(/mv_drill_project/block/@HeightLedg)[1]', 'nvarchar(max)') AS HeightLedg
+FROM [MbData].[dbo].[messages]
+WHERE flow_id='7987884B-6185-47EF-A3B7-48E0AA3E3300'
+  AND create_date>'2024-11-01 00:00:02.4034630'
+  AND CAST([raw_data] AS XML).exist('/mv_drill_project/block[@BlockArea and @HeightLedg]') = 1
+  AND (
+      [raw_data] LIKE '%1095-26%' OR
+      [raw_data] LIKE '%1095-27%' OR
+      [raw_data] LIKE '%1095-28%' OR
+      [raw_data] LIKE '%1095-33%' OR
+      [raw_data] LIKE '%1095-35%' OR
+      [raw_data] LIKE '%1095-38%' OR
+      [raw_data] LIKE '%1140-24%' OR
+      [raw_data] LIKE '%1155-17%' OR
+      [raw_data] LIKE '%1155-18%' OR
+      [raw_data] LIKE '%760-26%' OR
+      [raw_data] LIKE '%760-27%' OR
+      [raw_data] LIKE '%760-28%' OR
+      [raw_data] LIKE '%760-30%' OR
+      [raw_data] LIKE '%760-31%' OR
+      [raw_data] LIKE '%760-34%' OR
+      [raw_data] LIKE '%775-19%' OR
+      [raw_data] LIKE '%775-19%' OR
+      [raw_data] LIKE '%972-58%' OR
+      [raw_data] LIKE '%972-59%' OR
+      [raw_data] LIKE '%972-60%' OR
+      [raw_data] LIKE '%972-61%' OR
+      [raw_data] LIKE '%972-62%' OR
+      [raw_data] LIKE '%972-64%' OR
+      [raw_data] LIKE '%972-65%' OR
+      [raw_data] LIKE '%972-67%' OR
+      [raw_data] LIKE '%972-70%' OR
+      [raw_data] LIKE '%972-71%' OR
+      [raw_data] LIKE '%982-53%' OR
+      [raw_data] LIKE '%982-54%' OR
+      [raw_data] LIKE '%982-55%'
+  )
 
